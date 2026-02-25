@@ -8,7 +8,7 @@ It is a derivative of my fuller decoder [PyFT8](https://github.com/G1OJS/PyFT8) 
 <img width="1004" height="1042" alt="screenshot" src="https://github.com/user-attachments/assets/d92efaaa-659c-4ee3-8151-9d1874b8afce" />
 
 ## Uses
-This is really a 'toy' decoder but it illustrates what can be done in about 300 lines of Python. To run it, download the main Python file and run it as main from your favourite IDE, or develop it as you wish.
+This is really a 'toy' decoder but it illustrates what can be done in about 300 lines of Python. To run it, download the main Python file and run it as main from your favourite IDE, or develop it as you wish. I might make it into a PyPi package with a CLI at some point. 
 
 ## Acknowledgements
 This project implements a decoder for the FT8 digital mode. FT8 was developed by Joe Taylor, K1JT, Steve Franke, K9AN, and others as part of the WSJT-X project.
