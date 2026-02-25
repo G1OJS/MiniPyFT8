@@ -1,5 +1,5 @@
 # MiniPyFT8 
-This repo contains a minimised FT8 decoder written entirely in Python. 
+This repo contains a minimised FT8 decoder written entirely in Python, using Matplotlib to display the waterfall.
 
 It includes an annotated waterfall and LDPC decoder in about 300 lines of Python code. 
 
