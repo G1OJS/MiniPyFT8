@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time, pyaudio, threading, queue
 
-params = {'MIN_LLR_SD': 0.0,'HPS': 4, 'BPT':2,'SYM_RATE': 6.25,'SAMP_RATE': 12000, 'T_CYC':15, 'WFBOX_LIFETIME': 15,
-          'T_SEARCH_0': 4.6, 'T_SEARCH_1': 10.6, 'PAYLOAD_SECONDS': (79-7)*0.16, 'LDPC_CONTROL': (45, 13) }
+params = {'MIN_LLR_SD': 0.0,'HPS': 4, 'BPT':2,'SYM_RATE': 6.25,'SAMP_RATE': 12000, 'T_CYC':15, 'WFBOX_LIFETIME': 25,
+          'T_SEARCH_0': 4.6, 'T_SEARCH_1': 10.6, 'PAYLOAD_SYMBOLS': 79-7, 'LDPC_CONTROL': (45, 10) }
 params.update({'H0_RANGE': [-7 * params['HPS'], int(3.48 * params['SYM_RATE'] * params['HPS'])]})
 
 #=========== Unpacking functions ========================================
@@ -172,7 +172,7 @@ class Waterfall:
         self.fig.suptitle("G1OJS MiniPyFT8 with LDPC in ~ 300 lines")
         plt.tight_layout()
         self.ax.set_axis_off()
-        self.image = self.ax.imshow(self.dBgrid.T,vmax=100,vmin=70,origin='lower',interpolation='none')
+        self.image = self.ax.imshow(self.dBgrid.T,vmax=120,vmin=90,origin='lower',interpolation='none')
         self.ani = FuncAnimation(self.fig,self._animate,interval=40,frames=(100000), blit=True)
 
     def tidy(self):
@@ -190,6 +190,8 @@ class Waterfall:
         while not self.decode_queue.empty():
             tbin, fbin, text = self.decode_queue.get()
             self._add_or_update_box(tbin, fbin, text)
+        if (frame % 10 == 0):
+            self.tidy()
         return [self.image, *self.ax.patches, *self.ax.texts]
 
     def _add_or_update_box(self, tbin, fbin, text):
@@ -206,11 +208,7 @@ def cycle_time():
 def cyclestart_str(t):
     cyclestart_time = params['T_CYC'] * int( t / params['T_CYC'] )
     return time.strftime("%y%m%d_%H%M%S", time.gmtime(cyclestart_time))
-
-def wait_for_time(s, tmax = params['T_CYC'], granularity = 0.05):
-    while (cycle_time()-2*granularity < s < tmax - 2*granularity):
-        time.sleep(granularity)
-            
+         
 def cycle_manager(audio_in, freq_range, on_decode, silent, waterfall):
     ldpc = LdpcDecoder()
     nFreqs = audio_in.nFreqs
@@ -221,6 +219,7 @@ def cycle_manager(audio_in, freq_range, on_decode, silent, waterfall):
     hop_idxs_Costas =  np.arange(7) * params['HPS']
     base_freq_idxs = np.array([params['BPT'] // 2 + params['BPT'] * t for t in range(8)])
     syncs = [{}] * nFreqs
+    origins_for_decode = [(0, 0)] * nFreqs
     csync = np.full((7, 8*params['BPT']), -1/7, np.float32)
     for sym_idx, tone in enumerate([3,1,4,0,6,5,2]):
         fbins = range(tone* params['BPT'], (tone+1) * params['BPT'])
@@ -232,14 +231,17 @@ def cycle_manager(audio_in, freq_range, on_decode, silent, waterfall):
     
     while True:
         # Search
-        wait_for_time(params['T_SEARCH_1'])
-        waterfall.tidy()
-        t_decode = 0
+        delay = params['T_SEARCH_1'] - cycle_time()
+        if (delay > 0): time.sleep(delay)
+        if (delay < 0): print(f"WARNING: decoding taking too long, delayed search by {-delay:5.1f} seconds")
         cycle = audio_in.dBgrid_main_ptr // audio_in.hops_per_cycle
         cycle_h0 = cycle * audio_in.hops_per_cycle
+        if (cycle == 0):
+            audio_in.dBgrid_main_ptr = int(cycle_time() * params['SYM_RATE']*params['HPS'])
         if not silent:
             print("=================================================")
-            print("Cycle         Time dt     sy nits Sigma Message")  
+            print("Cycle         Time dt     sy nits Sigma Message")
+        origins_for_decode = [(0, 0)] * nFreqs
         for fb in range(nFreqs - 8 * params['BPT']):
             freq_idxs = fb + base_freq_idxs
             p_dB = audio_in.dBgrid_main[:, fb:fb+8*params['BPT']]
@@ -249,55 +251,56 @@ def cycle_manager(audio_in, freq_range, on_decode, silent, waterfall):
                 test_sync = {'h0_idx':h0_idx, 'score':sync_score, 'dt': h0_idx * dt - 0.7}
                 if test_sync['score'] > syncs[fb]['score']:
                     syncs[fb] = test_sync
-                    last_payload_hop_time = syncs[fb]['h0_idx']*dt + params['PAYLOAD_SECONDS'] - cycle * params['T_CYC']
-                    t_decode = np.max([t_decode, last_payload_hop_time])
-
+                    origins_for_decode[fb] = (syncs[fb]['h0_idx'], fb)
         # Decode
-        wait_for_time(t_decode)
-        if (cycle == 0):
-            audio_in.dBgrid_main_ptr = int(cycle_time() * params['SYM_RATE']*params['HPS'])
-        waterfall.tidy()
         duplicates_filter = []
         cs = cyclestart_str(time.time())
-        for fb in range(nFreqs - 8 * params['BPT']):
-            hops = syncs[fb]['h0_idx'] + base_payload_hops
-            freq_idxs = fb + base_freq_idxs
-            p_dB = audio_in.dBgrid_main[np.ix_(hops, freq_idxs)]
-            p = np.clip(p_dB - np.max(p_dB), -80, 0)
-            llra = np.max(p[:, [4,5,6,7]], axis=1) - np.max(p[:, [0,1,2,3]], axis=1)
-            llrb = np.max(p[:, [2,3,4,7]], axis=1) - np.max(p[:, [0,1,5,6]], axis=1)
-            llrc = np.max(p[:, [1,2,6,7]], axis=1) - np.max(p[:, [0,3,4,5]], axis=1)
-            llr = np.column_stack((llra, llrb, llrc))
-            llr = llr.ravel() / 10
-            llr_sd = int(0.5+100*np.std(llr))/100.0
-            llr = 3.5 * llr / (llr_sd + 0.01)
-            llr = np.clip(llr, -3.7, 3.7)
-            if llr_sd > params['MIN_LLR_SD']:
-                ldpc_it = 0
-                ncheck = ldpc.calc_ncheck(llr)
-                ncheck0 = ncheck
-                if ncheck > 0:
-                    if ncheck <= params['LDPC_CONTROL'][0]:
-                        for ldpc_it in range(params['LDPC_CONTROL'][1]):
-                            llr, ncheck = ldpc.do_ldpc_iteration(llr)
-                            if(ncheck == 0):
-                                break                    
-                if ncheck == 0:
-                    bits91_int = 0
-                    for bit in (llr[:91] > 0).astype(int).tolist():
-                        bits91_int = (bits91_int << 1) | bit
-                    bits77_int = check_crc(bits91_int)
-                    if(bits77_int):
-                        msg = unpack(bits77_int)
-                        if(msg not in duplicates_filter):
-                            waterfall.post_decode(syncs[fb]['h0_idx'], fb, ' '.join(msg))
-                            duplicates_filter.append(msg)
-                            decode_dict = {'decoder': 'PyFT8', 'cs':cs, 'dt':syncs[fb]['dt'], 'f':0, 'sync_idx': 1, 'sync': syncs[fb],
-                                           'msg_tuple':msg, 'msg':' '.join(msg), 'ncheck0': 99,'snr': -30,'llr_sd':0,'decode_path':'','td': cycle_time() }
-                            if(on_decode):
-                                on_decode(decode_dict)
-                            if(not silent):
-                                print(f"{decode_dict['cs']} {decode_dict['td']:4.2f} {decode_dict['sync']['dt']:+4.2f} {decode_dict['sync_idx']:3d} {ldpc_it:3d} {llr_sd:5.2f}  {' '.join(msg)}")
+        origins_for_decode.sort(key = lambda o: o[0])
+        while len(origins_for_decode):
+            origins_for_decode = [h for h in origins_for_decode if h[0] is not None and
+                             (audio_in.dBgrid_main_ptr - h[0]) % audio_in.hops_per_cycle > params['PAYLOAD_SYMBOLS'] * params['HPS'] ]
+            for idx, origin in enumerate(origins_for_decode):
+                time.sleep(0.005)
+                hops, freq_idxs = origin[0] + base_payload_hops, origin[1] + base_freq_idxs
+                p_dB = audio_in.dBgrid_main[np.ix_(hops, freq_idxs)]
+                p = np.clip(p_dB - np.max(p_dB), -80, 0)
+                llra = np.max(p[:, [4,5,6,7]], axis=1) - np.max(p[:, [0,1,2,3]], axis=1)
+                llrb = np.max(p[:, [2,3,4,7]], axis=1) - np.max(p[:, [0,1,5,6]], axis=1)
+                llrc = np.max(p[:, [1,2,6,7]], axis=1) - np.max(p[:, [0,3,4,5]], axis=1)
+                llr = np.column_stack((llra, llrb, llrc))
+                llr = llr.ravel() / 10
+                llr_sd = int(0.5+100*np.std(llr))/100.0
+                llr = 3.5 * llr / (llr_sd + 0.01)
+                llr = np.clip(llr, -3.7, 3.7)
+                if llr_sd > params['MIN_LLR_SD']:
+                    ldpc_it = 0
+                    ncheck = ldpc.calc_ncheck(llr)
+                    ncheck0 = ncheck
+                    if ncheck > 0:
+                        if ncheck <= params['LDPC_CONTROL'][0]:
+                            for ldpc_it in range(params['LDPC_CONTROL'][1]):
+                                llr, ncheck = ldpc.do_ldpc_iteration(llr)
+                                if(ncheck == 0):
+                                    break                    
+                    if ncheck == 0:
+                        bits91_int = 0
+                        for bit in (llr[:91] > 0).astype(int).tolist():
+                            bits91_int = (bits91_int << 1) | bit
+                        bits77_int = check_crc(bits91_int)
+                        if(bits77_int):
+                            msg = unpack(bits77_int)
+                            if(msg not in duplicates_filter):
+                                fb = origin[1]
+                                waterfall.post_decode(syncs[fb]['h0_idx'], fb, ' '.join(msg))
+                                duplicates_filter.append(msg)
+                                decode_dict = {'decoder': 'PyFT8', 'cs':cs, 'dt':syncs[fb]['dt'], 'f':0, 'sync_idx': 1, 'sync': syncs[fb],
+                                               'msg_tuple':msg, 'msg':' '.join(msg), 'ncheck0': 99,'snr': -30,'llr_sd':0,'decode_path':'','td': cycle_time() }
+                                if(on_decode):
+                                    on_decode(decode_dict)
+                                if(not silent):
+                                    print(f"{decode_dict['cs']} {decode_dict['td']:4.2f} {decode_dict['sync']['dt']:+4.2f} {decode_dict['sync_idx']:3d} {ldpc_it:3d} {llr_sd:5.2f}  {' '.join(msg)}")
+                origins_for_decode[idx] = (None, None)
+
     
 def mini_cycle_manager(input_device_keywords = ['Mic', 'CODEC'], freq_range = [200, 3100], on_decode = None, silent = False):
     audio_in = AudioIn(input_device_keywords, freq_range[1])
