@@ -260,7 +260,8 @@ def cycle_manager(audio_in, freq_range, on_decode, silent, waterfall):
             origins_for_decode = [o for o in origins_for_decode if o[0] is not None]
             for idx, origin in enumerate(origins_for_decode[:10]):
                 time.sleep(0.005)
-                if origin[0] <= audio_in.dBgrid_main_ptr <= (origin[0] + params['PAYLOAD_SYMBOLS'] * params['HPS']):
+                ptr_rel_to_h0 = (audio_in.dBgrid_main_ptr - origin[0]) % audio_in.hops_per_grid
+                if 0 <=  ptr_rel_to_h0 <= params['PAYLOAD_SYMBOLS'] * params['HPS']:
                     continue
                 hops, freq_idxs = origin[0] + base_payload_hops, origin[1] + base_freq_idxs
                 p_dB = audio_in.dBgrid_main[np.ix_(hops, freq_idxs)]
