@@ -300,14 +300,9 @@ def cycle_manager(audio_in, freq_range, on_decode, silent, waterfall):
                                     print(f"{decode_dict['cs']} {decode_dict['td']:4.2f} {decode_dict['sync']['dt']:+4.2f} {decode_dict['sync_idx']:3d} {ldpc_it:3d} {llr_sd:5.2f}  {' '.join(msg)}")
                 origins_for_decode[idx] = (None, None)
 
-    
-def mini_cycle_manager(input_device_keywords = ['Mic', 'CODEC'], freq_range = [200, 3100], on_decode = None, silent = False):
-    audio_in = AudioIn(input_device_keywords, freq_range[1])
-    waterfall = Waterfall(audio_in.dBgrid_main, params)
-    threading.Thread(target = cycle_manager, args =(audio_in, freq_range, on_decode, silent, waterfall,), daemon=True ).start()
-    plt.show()
-  
 if __name__ == "__main__":
-    mini_cycle_manager(['Mic', 'CODEC'], [200, 3100])
-    
+    audio_in = AudioIn(['Mic', 'CODEC'], 3100)
+    waterfall = Waterfall(audio_in.dBgrid_main, params)
+    threading.Thread(target = cycle_manager, args =(audio_in, [200, 3100], None, False, waterfall,), daemon=True ).start()
+    plt.show()  
 
