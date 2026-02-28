@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import time, pyaudio, threading, queue
 
 params = {'MIN_LLR_SD': 0.0,'HPS': 4, 'BPT':2,'SYM_RATE': 6.25,'SAMP_RATE': 12000, 'T_CYC':15, 'WFBOX_LIFETIME': 25,
-          'T_SEARCH_0': 4.6, 'T_SEARCH_1': 10.6, 'PAYLOAD_SYMBOLS': 79-7, 'LDPC_CONTROL': (45, 10) }
+          'T_SEARCH_0': 4.6, 'T_SEARCH_1': 10.6, 'PAYLOAD_SYMBOLS': 79-7, 'LDPC_CONTROL': (45, 12) }
 params.update({'H0_RANGE': [-7 * params['HPS'], int(3.48 * params['SYM_RATE'] * params['HPS'])]})
 
 #=========== Unpacking functions ========================================
@@ -116,11 +116,11 @@ class AudioIn:
         self.hops_per_cycle = int(params['T_CYC'] * params['SYM_RATE'] * params['HPS'])
         self.hops_per_grid = 2 * self.hops_per_cycle
         self.dBgrid_main = np.ones((self.hops_per_grid, self.nFreqs), dtype = np.float32)
-        self.dBgrid_main_ptr = 0
         indev = self.find_device(input_device_keywords)
         self.stream = pyaudio.PyAudio().open(
             format = pyaudio.paInt16, channels=1, rate = params['SAMP_RATE'], input = True, input_device_index = indev,
             frames_per_buffer = int(params['SAMP_RATE'] / (params['SYM_RATE'] * params['HPS'])), stream_callback=self._callback,)
+        self.dBgrid_main_ptr = int(cycle_time() * params['SYM_RATE']*params['HPS'])
         self.stream.start_stream()
 
     def find_device(self, device_str_contains):
@@ -227,7 +227,6 @@ def cycle_manager(audio_in, freq_range, on_decode, silent, waterfall):
         csync[sym_idx, 7 * params['BPT']:] = 0.0
     csync_flat =  csync.ravel()
     duplicates_filter = []
-    audio_in.dBgrid_main_ptr = 0
     
     while True:
         # Search
@@ -236,8 +235,6 @@ def cycle_manager(audio_in, freq_range, on_decode, silent, waterfall):
         if (delay < 0): print(f"WARNING: decoding taking too long, delayed search by {-delay:5.1f} seconds")
         cycle = audio_in.dBgrid_main_ptr // audio_in.hops_per_cycle
         cycle_h0 = cycle * audio_in.hops_per_cycle
-        if (cycle == 0):
-            audio_in.dBgrid_main_ptr = int(cycle_time() * params['SYM_RATE']*params['HPS'])
         if not silent:
             print("=================================================")
             print("Cycle         Time dt     sy nits Sigma Message")
