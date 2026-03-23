@@ -6,56 +6,109 @@ params = {'MIN_LLR_SD': 0.0,'HPS': 4, 'BPT':2,'SYM_RATE': 6.25,'SAMP_RATE': 1200
           'T_SEARCH_0': 4.6, 'T_SEARCH_1': 10.6, 'PAYLOAD_SYMBOLS': 79-7, 'LDPC_CONTROL': (45, 12) }
 params.update({'H0_RANGE': [-7 * params['HPS'], int(3.48 * params['SYM_RATE'] * params['HPS'])]})
 
+call_hashes = {}
+
+def add_call_hashes(call):
+    global call_hashes
+    chars = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/"
+    call_padded = (call + "          ")[:11]
+    hashes = []
+    for m in [10,12,22]:
+        x = 0
+        for c in call_padded:
+            x = 38*x + chars.find(c)
+            x = x & ((int(1) << 64) - 1)
+        x = x & ((1 << 64) - 1)
+        x = x * 47055833459
+        x = x & ((1 << 64) - 1)
+        x = x >> (64 - m)
+        hashes.append(x)
+        call_hashes[(x, m)] = call
+    return hashes
+
 #=========== Unpacking functions ========================================
-from string import ascii_uppercase as ltrs, digits as digs
-CALL_FIELDS = [ (' ' + digs + ltrs, 36*10*27**3),   (digs + ltrs, 10*27**3), (digs + ' ' * 17, 27**3),
-                (' ' + ltrs, 27**2),           (' ' + ltrs,   27), (' ' + ltrs,   1) ]
-CALL_TOKENS = ("DE", "QRZ", "CQ")
-NCALL_TOKENS_PLUS_MAX22 = 2_063_592 + 4_194_304
-GRID_RR73s = ('', '', 'RRR', 'RR73', '73')
-FT8_MSG_FORMAT = (("i3", 3), ("grid", 16), ("callB",29), ("callA",29))
-
-def get_fields(bits, fmt):
-    out = {}
-    for name, n in fmt:
+def get_bitfields(bits, lengths):
+    fields = []
+    for n in lengths:
         mask = (1 << n) - 1
-        out[name] = bits & mask
+        fields.append(bits & mask)
         bits >>= n
-    return out
+    return *fields, bits
 
-def unpack(bits77):
-    fields = get_fields(bits77, FT8_MSG_FORMAT)
-    return (decode_call(fields["callA"]), decode_call(fields["callB"]), decode_grid(fields["grid"]))
+def unpack(bits):
+    i3, bits74 = get_bitfields(bits,[3])
+    if i3 == 0:
+        n3, bits71 = get_bitfields(bits74,[3])
+        if n3 == 0:
+            return ('Free text','not','implemented')
+        else:
+            return (['DXpedition','Field Day', 'Field Day', 'Telemetry'][n3-1],'not','implemented')
+    elif i3 == 1 or i3 == 2: # 1 = Std Msg incl /R 2 = 'EU VHF' = Std Msg incl /P
+        return unpack_std(bits74, i3)
+    elif i3 == 3:
+        return ('RTTY RU','not','implemented')
+    elif i3 == 4:
+        cq, rrr, swp, c58, hsh, _ = get_bitfields(bits74, [1,2,1,58,12]) 
+        ca = "CQ" if cq else call_hashes.get((hsh,12), '<....>')
+        cb = ""
+        for i in range(12):
+            cb = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/"[c58 % 38] + cb
+            c58 = c58 // 38
+        cb =  cb.strip()
+        add_call_hashes(cb)
+        (ca, cb) = (cb, ca) if swp else (ca, cb)
+        return (ca, cb, ('', 'RRR', 'RR73', '73')[rrr])
+    elif i3 == 5:
+        return ('EU VHF','not','implemented')
 
-def decode_call(call_int):
-    portable = call_int & 1
-    call_int >>= 1
-    if call_int < 3:
-        return CALL_TOKENS[call_int]
-    call_int -= NCALL_TOKENS_PLUS_MAX22
-    if call_int == 0:
-        return '<...>'
-    chars = []
-    for alphabet, div in CALL_FIELDS:
-        idx, call_int = divmod(call_int, div)
-        chars.append(alphabet[idx])
-    call = ''.join(chars).strip()
-    return call + '/P' if portable else call
-
-def decode_grid(grid_int):
-    g15 = grid_int & 0x7FFF
+def unpack_std(bits74, i3):
+    g16, cb29, ca29, _ = get_bitfields(bits74,[16,29,29])
+    g15 = g16 & 0x7FFF
     if g15 < 32400:
         a, nn = divmod(g15, 1800)
         b, nn = divmod(nn, 100)
         c, d = divmod(nn, 10)
-        return chr(65+a) + chr(65+b) + str(c) + str(d)
-    r = g15 - 32400
-    if r <= 4:
-        return GRID_RR73s[r]
-    snr = r - 35
-    ir = grid_int >> 15
-    prefix = 'R' if ir else ''
-    return prefix + f"{snr:+03d}"
+        grid_rpt =  chr(65+a) + chr(65+b) + str(c) + str(d)
+    elif g15 - 32400 <= 4:
+        grid_rpt =  ('', '', 'RRR', 'RR73', '73')[g15 - 32400]
+    else:
+        prefix = 'R' if (g16 >> 15) else ''
+        grid_rpt = prefix + f"{(g15 - 32435):+03d}"
+    return (call_29(ca29, i3), call_29(cb29, i3), grid_rpt)
+
+def call_29(call_int29, i3):    
+    portable_rover = call_int29 & 1
+    call_int28 = call_int29>>1
+    if call_int28 < 3:
+        return ['DE', 'QRZ', 'CQ'][call_int28]
+    elif call_int28 < 1004:
+        return f"CQ {call_int28 - 3:03d}"
+    elif call_int28 < 21443:
+        x, txt = call_int28 - 1003, ''
+        for i in range(4):
+            txt = " ABCDEFGHIJKLMNOPQRSTUVWXYZ"[int(x % 27)] + txt
+            x //= 27
+        return f"CQ {txt.strip()}"
+    elif call_int28 < 2063592+4194303:
+        return call_hashes.get((call_int28 - 2063592, 22), '<....>')
+    else:
+        call = standard_call28(call_int28, i3)
+        if portable_rover:
+            call = call + ('/P' if i3 == 2 else '/R')
+        add_call_hashes(call)
+        return call
+
+def standard_call28(call_int28, i3):
+    nn = call_int28 - (2063592 + 4194304)
+    from string import ascii_uppercase as ltrs, digits as digs
+    call_fields = [ (' ' + digs + ltrs, 36*10*27**3),   (digs + ltrs, 10*27**3), (digs + ' ' * 17, 27**3),
+                    (' ' + ltrs, 27**2),           (' ' + ltrs,   27), (' ' + ltrs,   1) ]
+    chars = []
+    for alphabet, div in call_fields:
+        idx, nn = divmod(nn, div)
+        chars.append(alphabet[idx])
+    call = ''.join(chars).strip()
+    return call
 #============== CRC ===========================================================
 def check_crc(bits91_int):
     bits77_int = bits91_int >> 14
