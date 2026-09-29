@@ -1,0 +1,37 @@
+[project]
+name = "MiniPyFT8"
+version = "0.0.1"
+license = "GPL-3.0-or-later"
+
+authors = [
+  { name="G1OJS", email="g1ojs@yahoo.com" },
+]
+description = "FT8 Decoding and Encoding in Python with test/loopback code"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "numpy>=1.24.0",
+    "scipy",
+    "matplotlib",
+    "pyaudio",
+    "pyserial",
+    "paho-mqtt",
+    "psutil"
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent"
+]
+
+keywords = ["ham radio", "radio", "FT8", "LDPC", "CPMFSK"]
+
+[project.urls]
+Homepage = "https://github.com/G1OJS/MiniPyFT8"
+Issues = "https://github.com/G1OJS/MiniPyFT8/issues"
+
+[tool.setuptools]
+packages = ["MiniPyFT8"]
+license-files = ["LICENSE"]
+
+[project.scripts]
+

@@ -1,298 +1,181 @@
-import numpy as np
-import time, pyaudio, threading, queue
+import tkinter as tk
+import tkinter.scrolledtext as st
+import time, threading, socket, queue
+from MiniPyFT8.receiver import Receiver
+from PyFT8.transmitter import get_ft8_symbols, symbols_to_audio_bytes
+MAX_TX_START_CYCLETIME = 3
 
-params = {'MIN_LLR_SD': 0.0,'HPS': 4, 'BPT':2,'SYM_RATE': 6.25,'SAMP_RATE': 12000, 'WFBOX_LIFETIME': 25,
-          'T_SEARCH_0': 4.6, 'T_SEARCH_1': 10.6, 'PAYLOAD_SYMBOLS': 79-7, 'LDPC_CONTROL': (36, 6) }
-params.update({'H0_RANGE': [-7 * params['HPS'], int(3.48 * params['SYM_RATE'] * params['HPS'])]})
+"""
+class QSO_manager:
+    def __init__(self, myCall, myGrid, rig_control, soundcard_out, console_print, waterfall_data):
+        self.soundcard_out = soundcard_out
+        self.waterfall_data = waterfall_data
+        self.in_qso_with = False
+        self.tx_payload, self.last_tx_payload = None, None
+        self.band_info = {'current_band': None, 'fMHz':0}
+        self.transmitting = False
+        self.tx_cycle = 0
+        self.console_print = console_print
+        self.rig = rig_control
+        self.myCall, self.myGrid = myCall, myGrid
+        self.tx_freq = 750
+        self.console_print(f"[PyFT8] QSO handler started for {self.myCall}")
+        threading.Thread(target = self._transmit_daemon, daemon = True).start()
 
-call_hashes = {}
+    def _find_clear_freq(self, fmax):
+        import numpy as np
+        fbin_sum = np.sum(self.waterfall_data['data'], axis = 1)
+        f0_idx, fn_idx = int(500/self.waterfall_data['df']), int(fmax/self.waterfall_data['df'])
+        idx = np.argmin(fbin_sum[f0_idx:fn_idx])
+        clearest_frequency = (f0_idx + idx) * self.waterfall_data['df']
+        return clearest_frequency
 
-def add_call_hashes(call):
-    global call_hashes
-    chars = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/"
-    call_padded = (call + "          ")[:11]
-    hashes = []
-    for m in [10,12,22]:
-        x = 0
-        for c in call_padded:
-            x = 38*x + chars.find(c)
-            x = x & ((int(1) << 64) - 1)
-        x = x & ((1 << 64) - 1)
-        x = x * 47055833459
-        x = x & ((1 << 64) - 1)
-        x = x >> (64 - m)
-        hashes.append(x)
-        call_hashes[(x, m)] = call
-    return hashes
+    def _start_qso(self, their_call, their_snr, tx_cycle, band_info):
+        gmt = time.gmtime()
+        self.logging_info = {'operator':self.myCall, 'station_callsign':self.myCall, 'my_gridsquare':self.myGrid, 'mode':'FT8',
+                             'time_on': time.strftime("%H%M%S", gmt), 'qso_date':time.strftime("%Y%m%d", gmt),
+                             'band':band_info['current_band'], 'freq':band_info['fMHz'],
+                             'call':their_call, 'rst_sent':their_snr}
+        self.tx_cycle = tx_cycle
+        maxfreq = 950 if self.band_info['current_band'] == '60m' else 2500
+        self.tx_freq = self._find_clear_freq(maxfreq)
+        self.in_qso_with = their_call
 
-#=========== Unpacking functions ========================================
-def get_bitfields(bits, lengths):
-    fields = []
-    for n in lengths:
-        mask = (1 << n) - 1
-        fields.append(bits & mask)
-        bits >>= n
-    return *fields, bits
+    def _add_their_report_or_grid(self, grid_rpt):
+        if any([m for m in ['+','-'] if m in grid_rpt]): # grid_rpt == rpt
+            self.logging_info.update({'rst_rcvd': grid_rpt})
+        if not any([m for m in ['+','-','RR','73'] if m in grid_rpt]): # grid_rpt == grid
+            self.logging_info.update({'gridsquare': grid_rpt})
 
-def unpack(bits):
-    i3, bits74 = get_bitfields(bits,[3])
-    if i3 == 0:
-        n3, bits71 = get_bitfields(bits74,[3])
-        if n3 == 0:
-            return ('Free text','not','implemented')
+    def _determine_reply(self, message_type, their_call, their_snr, grid_rpt):
+        if message_type == "CQ":
+            reply = f"{their_call} {self.myCall} {self.myGrid[:4]}"   
+        if message_type == "to_me":
+            reply = f"{their_call} {self.myCall} {their_snr}"
+            if any([m for m in ['+','-'] if m in grid_rpt]):
+                reply = f"{their_call} {self.myCall} R{their_snr}"
+            if any([m for m in ['R+','R-','RRR'] if m in grid_rpt]):
+                reply = f"{their_call} {self.myCall} RR73"
+            if grid_rpt == 'RR73':
+                reply = f"{their_call} {self.myCall} 73"
+        return reply
+
+    def _end_qso(self):
+        gmt = time.gmtime()
+        print({'time_off': time.strftime("%H%M%S", gmt), 'qso_date_off':time.strftime("%Y%m%d", gmt)})
+        self.in_qso_with = False
+
+    def on_click(self, clickargs):
+        btn_action = clickargs['action']
+        if btn_action == "TX_OFF":
+            self.console_print("[PyFT8] Set PTT Off")
+            self.rig.ptt_off()
+            self.tx_payload = None
+        if self.transmitting:
+            return
+        if btn_action in ['MESSAGE_CLICK','CQ'] and self.band_info['current_band'] is None:
+            self.console_print("Please select a band before transmitting", color = 'red')
+            return
+        if btn_action == "SET_BAND":
+            self.band_info = clickargs['band_info']
+            self.rig.set_freq_Hz(int(1000000*float(self.band_info['fMHz'])))
+        if btn_action == "CQ":
+            tnow = time.time()
+            self.tx_cycle = int(tnow / T_CYC) % 2
+            if tnow % T_CYC > MAX_TX_START_CYCLETIME:
+                self.tx_cycle = 1 - self.tx_cycle 
+            self._set_tx_payload(f"CQ {self.myCall} {self.myGrid[:4]}")
+        if btn_action == "RPT_LAST":
+            self.tx_payload = self.last_tx_payload
+
+        if btn_action == "MESSAGE_CLICK":
+            m = clickargs['message']
+            short_msg = ' '.join(m['msg_tuple'])
+            self.console_print(f"[QSO] Clicked on message '{short_msg}'")
+            self._reply_to_message(m)
+
+
+    def process_message(self, m):
+        if self.in_qso_with == m['msg_tuple'][1]:
+            if m['msg_tuple'][0] == self.myCall:
+                short_msg = ' '.join(m['msg_tuple'])
+                self.console_print(f"[QSO] Auto reply to message '{short_msg}'")
+                self._reply_to_message(m)
+
+    def _reply_to_message(self, m):
+        message_type = m['message_type']
+        if message_type in ['CQ','to_me'] and m['band'] == self.band_info['current_band']:
+            _ , their_call, grid_rpt = m['msg_tuple']
+            their_call = their_call.replace('<','').replace('>','')
+            their_snr = m['their_snr']
+            their_tx_cycle = m['their_tx_cycle']
+            if their_call != self.in_qso_with:
+                self._start_qso(their_call, their_snr, 1 - their_tx_cycle, self.band_info)
+            self._add_their_report_or_grid(grid_rpt)
+            reply = self._determine_reply(message_type, their_call, their_snr, grid_rpt)
+            self._set_tx_payload(reply)
+            if reply.endswith("73"):
+                self._end_qso()
+
+    def _set_tx_payload(self, tx_text):
+        self.console_print(f"[QSO] Set transmit m to '{tx_text}' (cyc {self.tx_cycle}, {self.tx_freq:5.1f} Hz)")
+        if len(tx_text.split(' ')) == 3:           
+            symbols = get_ft8_symbols(tx_text)
+            audio_bytes = symbols_to_audio_bytes(symbols, f_base = self.tx_freq)
+            self.tx_payload = {'audio_bytes':audio_bytes, 'start_gridtime':[0.25, 15.25][self.tx_cycle]}
         else:
-            return (['DXpedition','Field Day', 'Field Day', 'Telemetry'][n3-1],'not','implemented')
-    elif i3 == 1 or i3 == 2: # 1 = Std Msg incl /R 2 = 'EU VHF' = Std Msg incl /P
-        return unpack_std(bits74, i3)
-    elif i3 == 3:
-        return ('RTTY RU','not','implemented')
-    elif i3 == 4:
-        cq, rrr, swp, c58, hsh, _ = get_bitfields(bits74, [1,2,1,58,12]) 
-        ca = "CQ" if cq else call_hashes.get((hsh,12), '<....>')
-        cb = ""
-        for i in range(12):
-            cb = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/"[c58 % 38] + cb
-            c58 = c58 // 38
-        cb =  cb.strip()
-        add_call_hashes(cb)
-        (ca, cb) = (cb, ca) if swp else (ca, cb)
-        return (ca, cb, ('', 'RRR', 'RR73', '73')[rrr])
-    elif i3 == 5:
-        return ('EU VHF','not','implemented')
+            self.console_print(f"[QSO] m is malformed", color = 'red')
+            
+    def _transmit_daemon(self):
+        while True:
+            time.sleep(0.1)
+            if self.tx_payload is not None:
+                start_gridtime = self.tx_payload['start_gridtime'] 
+                grid_time = time.time() % (2 * T_CYC)
+                if start_gridtime <= grid_time < start_gridtime + MAX_TX_START_CYCLETIME:
+                    self.rig.ptt_on()
+                    self.transmitting = True
+                    self.soundcard_out.transmit_audio_data_bytes(self.tx_payload['audio_bytes'])
+                    self.rig.ptt_off()
+                    self.transmitting = False
+                    self.last_tx_payload = self.tx_payload
+                    self.tx_payload = None
 
-def unpack_std(bits74, i3):
-    g16, cb29, ca29, _ = get_bitfields(bits74,[16,29,29])
-    g15 = g16 & 0x7FFF
-    if g15 < 32400:
-        a, nn = divmod(g15, 1800)
-        b, nn = divmod(nn, 100)
-        c, d = divmod(nn, 10)
-        grid_rpt =  chr(65+a) + chr(65+b) + str(c) + str(d)
-    elif g15 - 32400 <= 4:
-        grid_rpt =  ('', '', 'RRR', 'RR73', '73')[g15 - 32400]
-    else:
-        prefix = 'R' if (g16 >> 15) else ''
-        grid_rpt = prefix + f"{(g15 - 32435):+03d}"
-    return (call_29(ca29, i3), call_29(cb29, i3), grid_rpt)
+"""
 
-def call_29(call_int29, i3):    
-    portable_rover = call_int29 & 1
-    call_int28 = call_int29>>1
-    if call_int28 < 3:
-        return ['DE', 'QRZ', 'CQ'][call_int28]
-    elif call_int28 < 1004:
-        return f"CQ {call_int28 - 3:03d}"
-    elif call_int28 < 21443:
-        x, txt = call_int28 - 1003, ''
-        for i in range(4):
-            txt = " ABCDEFGHIJKLMNOPQRSTUVWXYZ"[int(x % 27)] + txt
-            x //= 27
-        return f"CQ {txt.strip()}"
-    elif call_int28 < 2063592+4194303:
-        return call_hashes.get((call_int28 - 2063592, 22), '<....>')
-    else:
-        call = standard_call28(call_int28, i3)
-        if portable_rover:
-            call = call + ('/P' if i3 == 2 else '/R')
-        add_call_hashes(call)
-        return call
-
-def standard_call28(call_int28, i3):
-    nn = call_int28 - (2063592 + 4194304)
-    from string import ascii_uppercase as ltrs, digits as digs
-    call_fields = [ (' ' + digs + ltrs, 36*10*27**3),   (digs + ltrs, 10*27**3), (digs + ' ' * 17, 27**3),
-                    (' ' + ltrs, 27**2),           (' ' + ltrs,   27), (' ' + ltrs,   1) ]
-    chars = []
-    for alphabet, div in call_fields:
-        idx, nn = divmod(nn, div)
-        chars.append(alphabet[idx])
-    call = ''.join(chars).strip()
-    return call
-#============== CRC ===========================================================
-def check_crc(bits91_int):
-    bits77_int = bits91_int >> 14
-    if(bits77_int > 0):
-        crc14_int = 0
-        for i in range(96):
-            inbit = ((bits77_int >> (76 - i)) & 1) if i < 77 else 0
-            bit14 = (crc14_int >> (14 - 1)) & 1
-            crc14_int = ((crc14_int << 1) & ((1 << 14) - 1)) | inbit
-            if bit14:
-                crc14_int ^= 0x2757
-        if(crc14_int == bits91_int & 0b11111111111111):
-            return bits77_int
-
-#============== LDPC Decoder ========================================================
-CV6idx = np.array([[4,31,59,92,114,145],[5,23,60,93,121,150],[6,32,61,94,95,142],[5,31,63,96,125,137],[8,34,65,98,138,145],[9,35,66,99,106,125],[11,37,67,101,104,154],[12,38,68,102,148,161],[14,41,58,105,122,158],[0,32,71,105,106,156],[15,42,72,107,140,159],[10,43,74,109,120,165],[7,45,70,111,118,165],[18,37,76,103,115,162],[19,46,69,91,137,164],[1,47,73,112,127,159],[21,46,57,117,126,163],[15,38,61,111,133,157],[22,42,78,119,130,144],[19,35,62,93,135,160],[13,30,78,97,131,163],[2,43,79,123,126,168],[18,45,80,116,134,166],[11,49,60,117,118,143],[12,50,63,113,117,156],[23,51,75,128,147,148],[20,53,76,99,139,170],[34,81,132,141,170,173],[13,29,82,112,124,169],[3,28,67,119,133,172],[51,83,109,114,144,167],[6,49,80,98,131,172],[22,54,66,94,171,173],[25,40,76,108,140,147],[26,39,55,123,124,125],[17,48,54,123,140,166],[5,32,84,107,115,155],[8,53,62,130,146,154],[21,52,67,108,120,173],[2,12,47,77,94,122],[30,68,132,149,154,168],[4,38,74,101,135,166],[1,53,85,100,134,163],[14,55,86,107,118,170],[22,33,70,93,126,152],[10,48,87,91,141,156],[28,33,86,96,146,161],[21,56,84,92,139,158],[27,31,71,102,131,165],[0,25,44,79,127,146],[16,26,88,102,115,152],[50,56,97,162,164,171],[20,36,72,137,151,168],[15,46,75,129,136,153],[2,23,29,71,103,138],[8,39,89,105,133,150],[17,41,78,143,145,151],[24,37,64,98,121,159],[16,41,74,128,169,171]], dtype = np.int16)
-CV7idx = np.array([[3,30,58,90,91,95,152],[7,24,62,82,92,95,147],[4,33,64,77,97,106,153],[10,36,66,86,100,138,157],[7,39,69,81,103,113,144],[13,40,70,87,101,122,155],[16,36,73,80,108,130,153],[44,54,63,110,129,160,172],[17,35,75,88,112,113,142],[20,44,77,82,116,120,150],[18,34,58,72,109,124,160],[6,48,57,89,99,104,167],[24,52,68,89,100,129,155],[19,45,64,79,119,139,169],[0,3,51,56,85,135,151],[25,50,55,90,121,136,167],[1,26,40,60,61,114,132],[27,47,69,84,104,128,157],[11,42,65,88,96,134,158],[9,43,81,90,110,143,148],[29,49,59,85,136,141,161],[9,52,65,83,111,127,164],[27,28,83,87,116,142,149],[14,57,59,73,110,149,162]], dtype = np.int16)
-
-def calc_ncheck(llr):
-    bits6 = llr[CV6idx] > 0
-    parity6 = np.sum(bits6, axis=1) & 1
-    bits7 = llr[CV7idx] > 0
-    parity7 = np.sum(bits7, axis=1) & 1
-    return int(np.sum(parity7) + np.sum(parity6))
-
-def pass_messages(llr, CVidx, mC2V_prev, update_collector):
-    if mC2V_prev is None:
-        mC2V_prev = np.zeros(CVidx.shape, dtype=np.float32)
-    mV2C = llr[CVidx] - mC2V_prev
-    tanh_mV2C = np.tanh(-mV2C)
-    tanh_mC2V = np.prod(tanh_mV2C, axis=1, keepdims=True)
-    tanh_mC2V = tanh_mC2V / (tanh_mV2C + 0.001)
-    alpha_atanh_approx = 1.18
-    mC2V_curr  = tanh_mC2V / ((tanh_mC2V - alpha_atanh_approx) * (alpha_atanh_approx + tanh_mC2V))
-    np.add.at(update_collector, CVidx, mC2V_curr - mC2V_prev)
-    return mC2V_curr
-
-def decode(p):
-    llra = np.max(p[:, [4,5,6,7]], axis=1) - np.max(p[:, [0,1,2,3]], axis=1)
-    llrb = np.max(p[:, [2,3,4,7]], axis=1) - np.max(p[:, [0,1,5,6]], axis=1)
-    llrc = np.max(p[:, [1,2,6,7]], axis=1) - np.max(p[:, [0,3,4,5]], axis=1)
-    llr = np.column_stack((llra, llrb, llrc))
-    llr = llr.ravel()
-    ncheck = calc_ncheck(llr)
-    ldpc_it = 0
-    if 0 < ncheck <= params['LDPC_CONTROL'][0]:
-        llr = 3.5 * llr / (np.std(llr) + 0.01)
-        llr = np.clip(llr, -3.7, 3.7)
-        mC2V_prev6, mC2V_prev7 = None, None
-        for ldpc_it in range(params['LDPC_CONTROL'][1]):
-            update_collector = np.zeros_like(llr)
-            mC2V_prev6 = pass_messages(llr, CV6idx, mC2V_prev6, update_collector)
-            mC2V_prev7 = pass_messages(llr, CV7idx, mC2V_prev7, update_collector)
-            llr += update_collector
-            ncheck = calc_ncheck(llr)
-            if(ncheck == 0):
-                break                    
-    if ncheck == 0:
-        bits91_int = 0
-        for bit in (llr[:91] > 0).astype(int).tolist():
-            bits91_int = (bits91_int << 1) | bit
-        bits77_int = check_crc(bits91_int)
-        if(bits77_int):
-            msg = unpack(bits77_int)
-        return msg
-
-#============== AUDIO ========================================================
-class AudioIn:
-    def __init__(self, input_device_keywords, max_freq):
-        self.fft_len = int(params['BPT'] * params['SAMP_RATE'] // params['SYM_RATE'])
-        fft_out_len = self.fft_len // 2 + 1
-        self.nFreqs = int(fft_out_len * 2 * max_freq / params['SAMP_RATE'])
-        self.audio_buffer = np.zeros(self.fft_len, dtype=np.float32)
-        self.fft_in = np.zeros(self.fft_len, dtype=np.float32)
-        self.fft_window = fft_window=np.hanning(self.fft_len).astype(np.float32)
-        self.hops_per_cycle = int(15 * params['SYM_RATE'] * params['HPS'])
-        self.grid_main = np.ones((self.hops_per_cycle, self.nFreqs), dtype = np.float32)
-        indev = self.find_device(input_device_keywords)
-        self.stream = pyaudio.PyAudio().open(
-            format = pyaudio.paInt16, channels=1, rate = params['SAMP_RATE'], input = True, input_device_index = indev,
-            frames_per_buffer = int(params['SAMP_RATE'] / (params['SYM_RATE'] * params['HPS'])), stream_callback=self._callback,)
-        self.set_pointer()
-        self.stream.start_stream()
-
-    def find_device(self, device_str_contains):
-        pya = pyaudio.PyAudio()
-        for dev_idx in range(pya.get_device_count()):
-            name = pya.get_device_info_by_index(dev_idx)['name']
-            match = True
-            for pattern in device_str_contains:
-                if (not pattern in name): match = False
-            if(match):
-                return dev_idx
-        print(f"[Audio] No audio device found matching {device_str_contains}")
-
-    def set_pointer(self):
-        self.grid_main_ptr = int((time.time() % 15) * params['SYM_RATE']*params['HPS'])
-
-    def _callback(self, in_data, frame_count, time_info, status_flags):
-        samples = np.frombuffer(in_data, dtype=np.int16).astype(np.float32)
-        ns = len(samples)
-        self.audio_buffer[:-ns] = self.audio_buffer[ns:]
-        self.audio_buffer[-ns:] = samples
-        np.multiply(self.audio_buffer, self.fft_window, out=self.fft_in)
-        z = np.fft.rfft(self.fft_in)[:self.nFreqs]
-        self.grid_main[self.grid_main_ptr, :] = z.real*z.real + z.imag*z.imag
-        self.grid_main_ptr = (self.grid_main_ptr + 1) % self.hops_per_cycle
-        return (None, pyaudio.paContinue)
-               
-class DecodeManager:
-    def __init__(self):
+class App:
+    def __init__(self, root):
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.bind(('', 2121))
+        self.rx = Receiver()
         self.decode_queue = queue.Queue()
-        self.duplicate_filter = []
-        threading.Thread(target = self.run, daemon=True ).start()
+        self.root = root
+        self.frame = tk.Frame(self.root, bd = 2, bg = 'lightgrey')
+        self.frame.pack(padx=1, pady=1, side='left', fill='both', expand=True)
+        self.frm_decodes = tk.Frame(self.frame, bd = 2, bg = 'lightgrey', width = 600, height = 400)
+        self.frm_decodes.pack(padx=1, pady=1, side='left', fill='both', expand=True)
+        self.scrl_decodes = st.ScrolledText(self.frm_decodes)
+        self.scrl_decodes.pack()
+        self.root.bind("<<received_decode>>", self.received_decode)
+        threading.Thread(target = self.monitor_socket, daemon = True).start()
 
-    def reset_duplicate_filter(self):
-        self.duplicate_filter = []
-
-    def put(self, c):
-        self.decode_queue.put(c)
-
-    def run(self):
+    def monitor_socket(self):
         while True:
-            time.sleep(0.001)
-            if not self.decode_queue.empty():
-                sync, p = self.decode_queue.get()
-                msg = decode(p)
-                if msg and not msg in self.duplicate_filter:
-                    self.duplicate_filter.append(msg)
-                    print(f"{time.time() % 15:5.2f} {sync['fHz']:7.2f} {sync['dt']:+04.2f} {sync['score']:+07.1f} {' '.join(msg)}")            
+            time.sleep(0.1)
+            decode_text, addres = self.sock.recvfrom(1024)
+            decode_text = decode_text.decode()
+            if decode_text:
+                print(decode_text)
+                self.decode_queue.put(f"{decode_text}\n")
+                self.root.after(0, lambda: self.root.event_generate("<<received_decode>>"))
 
-class Receiver:
-    def __init__(self):
-        self.audio_in = AudioIn(['Mic', 'CODEC'], 3100)
-        self.decode_manager = DecodeManager()
-        threading.Thread(target = self.run, daemon=True ).start()
+    def received_decode(self, e):
+        text = self.decode_queue.get()
+        self.scrl_decodes.insert(tk.INSERT, text)
+
+
         
-    def run(self):
-        nFreqs = self.audio_in.nFreqs
-        dt = 1.0 / (params['SYM_RATE'] * params['HPS']) 
-        payload_symb_idxs = list(range(7, 36)) + list(range(43, 72))
-        base_payload_hops = np.array([params['HPS'] * s for s in payload_symb_idxs])
-        hop_idxs_Costas =  np.arange(7) * params['HPS']
-        base_freq_idxs = np.array([params['BPT'] // 2 + params['BPT'] * t for t in range(8)])
-        syncs = {}
-        csync = np.full((7, 8*params['BPT']), -1/7, np.float32)
-        for sym_idx, tone in enumerate([3,1,4,0,6,5,2]):
-            fbins = range(tone* params['BPT'], (tone+1) * params['BPT'])
-            csync[sym_idx, fbins] = 1.0
-            csync[sym_idx, 7 * params['BPT']:] = 0.0
-        csync_flat =  csync.ravel()
 
-        while True:
 
-            t0_cyc = time.time()
-            cycle_start_str = time.strftime("%y%m%d_%H%M%S", time.gmtime(t0_cyc + 1))
-            print(f"{cycle_start_str} ========================================")
-            self.audio_in.set_pointer()
-
-            time.sleep(params['T_SEARCH_1'])
-            for f0_idx in range(nFreqs - 8 * params['BPT']):
-                freq_idxs = f0_idx + base_freq_idxs
-                p = self.audio_in.grid_main[:, f0_idx:f0_idx+8*params['BPT']]
-                p = 20*np.log10(p)
-                syncs[f0_idx] = {'score':0, 'h0_idx':0, 'dt': 0}
-                for h0_idx in range(params['H0_RANGE'][0], params['H0_RANGE'][1]):
-                    hn_idx = h0_idx + base_payload_hops[-1]
-                    sync_score = float(np.dot(p[h0_idx + hop_idxs_Costas + 36 * params['HPS'], :].ravel(), csync_flat))
-                    test_sync = {'cs':cycle_start_str, 'score':sync_score, 'h0_idx':h0_idx, 'hn_idx': hn_idx, 'fHz': 3.125 * f0_idx, 'dt': h0_idx * dt - 0.7}
-                    if test_sync['score'] > syncs[f0_idx]['score']:
-                        syncs[f0_idx] = test_sync
-
-            self.decode_manager.reset_duplicate_filter()
-            while time.time() % 15 < 14.5:
-                time.sleep(0.05)
-                hop_ptr = self.audio_in.grid_main_ptr
-                f0_idxs = [f for f in list(syncs.keys()) if syncs[f]['score'] > 200 and hop_ptr > syncs[f]['hn_idx']]
-                for f0_idx in f0_idxs:
-                    hops, freq_idxs = syncs[f0_idx]['h0_idx'] + base_payload_hops, f0_idx + base_freq_idxs
-                    p = self.audio_in.grid_main[np.ix_(hops, freq_idxs)]
-                    p = 20*np.log10(p)
-                    self.decode_manager.put((syncs[f0_idx].copy(), p))
-                    syncs[f0_idx]['score'] = -1
-                
-if __name__ == "__main__":
-    rx = Receiver()
- 
-
+app = App(tk.Tk())
+app.root.mainloop()
