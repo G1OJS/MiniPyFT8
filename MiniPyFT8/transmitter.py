@@ -9,7 +9,7 @@ MAX_TX_START_CYCLETIME = 3
 #==================== SOUNDCARD OUT ================================================================
 
 class SoundcardOut:
-    def __init__(self, outputcard_keywords):
+    def __init__(self, outputcard_keywords = 'Speak, CODEC'):
         self.output_device_index = None
         self.pya = pyaudio.PyAudio()
         
@@ -86,12 +86,12 @@ def write_wav_file(audio_data_bytes, wave_output_file):
 def ifindex(arr, val, default = None):
     return arr.index(val) if val in arr else default
 
-def get_ft8_symbols(text):
+def get_ft8_symbols(text, get_call_hashes, add_call_hashes):
     c1, c2, grid_rpt = text.split(' ')
-    symbols, bits77 = pack_message(c1, c2, grid_rpt)
+    symbols, bits77 = pack_message(c1, c2, grid_rpt, get_call_hashes, add_call_hashes)
     return symbols
 
-def pack_message(c1, c2, gr):
+def pack_message(c1, c2, gr, get_call_hashes, add_call_hashes):
     c29a, c29b = pack_ft8_c29(c1), pack_ft8_c29(c2)
     g15, ir = pack_ft8_g15(gr)
     if c29a and c29b:
@@ -103,7 +103,7 @@ def pack_message(c1, c2, gr):
         symbols  = encode_bits77(bits77)
     if c29b and not c29a:
         add_call_hashes(c1)
-        c28a, p1a = 2063592 + hashes_for_calls[c1][2][0], 0
+        c28a, p1a = 2063592 + get_call_hashes(([c1][2][0], 0))
         c28b, p1b = c29b
         i3 = 2 if c2.endswith('/P') else 1
         n3 = 0    
@@ -111,7 +111,7 @@ def pack_message(c1, c2, gr):
         symbols  = encode_bits77(bits77)
     if c29a and not c29b:
         add_call_hashes(c2)
-        c28b, p1b = 2063592 + hashes_for_calls[c2][2][0], 0
+        c28b, p1b = 2063592 + get_call_hashes(([c2][2][0], 0))
         c28a, p1a = c29a
         i3 = 2 if c1.endswith('/P') else 1
         n3 = 0    
@@ -221,18 +221,19 @@ def append_crc(bits77_int):
 
 
 class Transmitter:
-    def __init__(self, get_call_hashes, add_call_hashes):
-        self.get_call_hashes = get_call_hashes
-        self.add_call_hashes = add_call_hashes
+    def __init__(self, get_call_hashes, add_call_hashes, rig):
+        self.get_call_hashes, self.add_call_hashes = get_call_hashes, add_call_hashes
+        self.rig = rig
         self.tx_freq = 777
         self.tx_payload = None
+        self.soundcard_out = SoundcardOut()
         threading.Thread(target = self.transmit_daemon, daemon = True).start()
 
     def set_transmit_payload(self, message):
-        print(f"{time.time() % 30} set tx payload")
+        print(f"{time.time() % 30} set tx payload {message}")
         odd_even = int(((time.time() + T_CYC - MAX_TX_START_CYCLETIME) % (2 * T_CYC)) / (2 * T_CYC))
         if len(message.split(' ')) == 3:           
-            symbols = get_ft8_symbols(message)
+            symbols = get_ft8_symbols(message, self.get_call_hashes, self.add_call_hashes)
             audio_bytes = symbols_to_audio_bytes(symbols, f_base = self.tx_freq)
         self.tx_payload = {'audio_bytes':audio_bytes, 'odd_even':odd_even}
         
@@ -247,9 +248,9 @@ class Transmitter:
                 time.sleep(t_delay)
                 grid_time = time.time() % (2 * T_CYC)
                 print(f"{time.time() % 30} transmit")
-              #  self.rig.ptt_on()
-              #  self.transmitting = True
-              #  self.soundcard_out.transmit_audio_data_bytes(self.tx_payload['audio_bytes'])
-              #  self.rig.ptt_off()
-              #  self.transmitting = False
+                self.rig.ptt_on()
+                self.transmitting = True
+                self.soundcard_out.transmit_audio_data_bytes(self.tx_payload['audio_bytes'])
+                self.rig.ptt_off()
+                self.transmitting = False
                 self.tx_payload = None

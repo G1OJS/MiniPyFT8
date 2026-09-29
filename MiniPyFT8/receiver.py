@@ -260,8 +260,8 @@ class Receiver:
         threading.Thread(target = self.decode_manager, daemon=True ).start()
         threading.Thread(target = self.cycle_manager, daemon=True ).start()
 
-    def get_call_hashes(self):
-        return call_hashes
+    def get_call_hashes(self, xm):
+        return call_hashes[xm]
 
     def add_call_hashes(self, call):
         add_call_hashes(call)

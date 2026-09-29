@@ -3,15 +3,38 @@ from tkinter import ttk
 import time, threading, socket, queue
 from MiniPyFT8.receiver import Receiver
 from MiniPyFT8.transmitter import Transmitter
+from MiniPyFT8.rigctrl import Rig_hamlib
+
 MAX_TX_START_CYCLETIME = 3
+
+myCall, myGrid = "G1OJS", "IO90"
+
+def determine_reply(rx_message, their_snr):
+    if rx_message == '':
+        return f"CQ {myCall} {myGrid}"
+    else:
+        hail, their_call, grid_rpt = rx_message.split(' ')
+        
+    if hail.startswith("CQ"):
+        reply = f"{their_call} {myCall} {myGrid[:4]}"   
+    elif hail.startswith(myCall):
+        reply = f"{their_call} {myCall} {their_snr}"
+        if any([m for m in ['+','-'] if m in grid_rpt]):
+            reply = f"{their_call} {myCall} R{their_snr}"
+        if any([m for m in ['R+','R-','RRR'] if m in grid_rpt]):
+            reply = f"{their_call} {myCall} RR73"
+        if grid_rpt == 'RR73':
+            reply = f"{their_call} {myCall} 73"
+    return reply
 
 class App:
     def __init__(self, root):
         self.call_hashes = {}
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind(('', 2121))
+        self.rig = Rig_hamlib()
         self.rx = Receiver()
-        self.tx = Transmitter(self.rx.get_call_hashes, self.rx.add_call_hashes)
+        self.tx = Transmitter(self.rx.get_call_hashes, self.rx.add_call_hashes, self.rig)
         self.decode_queue = queue.Queue()
         self.root = root
         self.container = ttk.Frame(self.root) 
@@ -50,8 +73,9 @@ class App:
 
     def row_click(self, e):
         curr = e.widget.index("current").split('.')[0]
-        print(e.widget.get(f"{curr}.0", f"{curr}.end"))
-        self.tx.set_transmit_payload("CQ G1OJS IO90")
+        rx_message = e.widget.get(f"{curr}.0", f"{curr}.end")
+        reply = determine_reply(rx_message, '-5')
+        self.tx.set_transmit_payload(reply)
 
     def monitor_socket(self):
         while True:
