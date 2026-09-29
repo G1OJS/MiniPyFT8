@@ -251,22 +251,16 @@ class AudioIn:
         self.grid_main[self.grid_main_ptr, :] = z.real*z.real + z.imag*z.imag
         self.grid_main_ptr = (self.grid_main_ptr + 1) % self.hops_per_cycle
         return (None, pyaudio.paContinue)
-               
-class DecodeManager:
+
+class Receiver:
     def __init__(self):
-        #self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.audio_in = AudioIn(['Mic', 'CODEC'], 3100)
         self.decode_queue = queue.Queue()
         self.duplicate_filter = []
-        threading.Thread(target = self.run, daemon=True ).start()
-        self.n_decodes = 0
+        threading.Thread(target = self.decode_manager, daemon=True ).start()
+        threading.Thread(target = self.cycle_manager, daemon=True ).start()
 
-    def reset_duplicate_filter(self):
-        self.duplicate_filter = []
-
-    def put(self, c):
-        self.decode_queue.put(c)
-
-    def run(self):
+    def decode_manager(self):
         while True:
             time.sleep(0.001)
             if not self.decode_queue.empty():
@@ -274,17 +268,9 @@ class DecodeManager:
                 msg = decode(p)
                 if msg and not msg in self.duplicate_filter:
                     self.duplicate_filter.append(msg)
-                    self.n_decodes += 1
-                    info = f"{self.n_decodes:4d} {time.time() % 15:5.2f} {sync['fHz']:7.2f} {sync['dt']:+04.2f} {sync['score']:+07.1f} {' '.join(msg)}"
-                    send_udp(info)
-
-class Receiver:
-    def __init__(self):
-        self.audio_in = AudioIn(['Mic', 'CODEC'], 3100)
-        self.decode_manager = DecodeManager()
-        threading.Thread(target = self.run, daemon=True ).start()
+                    send_udp(f"fHz,{sync['fHz']:7.2f},dt,{sync['dt']:+04.2f},msg,{','.join(msg)}")
         
-    def run(self):
+    def cycle_manager(self):
         nFreqs = self.audio_in.nFreqs
         dt = 1.0 / (params['SYM_RATE'] * params['HPS']) 
         payload_symb_idxs = list(range(7, 36)) + list(range(43, 72))
@@ -318,7 +304,7 @@ class Receiver:
                     if test_sync['score'] > syncs[f0_idx]['score']:
                         syncs[f0_idx] = test_sync
 
-            self.decode_manager.reset_duplicate_filter()
+            self.duplicate_filter = []
             while time.time() % 15 < 14.5:
                 time.sleep(0.05)
                 hop_ptr = self.audio_in.grid_main_ptr
@@ -327,7 +313,7 @@ class Receiver:
                     hops, freq_idxs = syncs[f0_idx]['h0_idx'] + base_payload_hops, f0_idx + base_freq_idxs
                     p = self.audio_in.grid_main[np.ix_(hops, freq_idxs)]
                     p = 20*np.log10(p)
-                    self.decode_manager.put((syncs[f0_idx].copy(), p))
+                    self.decode_queue.put((syncs[f0_idx].copy(), p))
                     syncs[f0_idx]['score'] = -1
 
 if __name__ == "__main__":

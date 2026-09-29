@@ -168,7 +168,8 @@ class App:
         threading.Thread(target = self.monitor_socket, daemon = True).start()
 
     def row_click(self, e):
-        print(e)
+        curr = e.widget.index("current").split('.')[0]
+        print(e.widget.get(f"{curr}.0", f"{curr}.end"))
 
     def monitor_socket(self):
         while True:
@@ -176,6 +177,8 @@ class App:
             decode_text, addres = self.sock.recvfrom(1024)
             decode_text = decode_text.decode()
             if decode_text:
+                if decode_text.startswith('fHz'):
+                    decode_text = ' '.join(decode_text.split(',')[5:])
                 self.decode_queue.put(f"{decode_text}\n")
                 self.root.after(0, lambda: self.root.event_generate("<<received_decode>>"))
 
@@ -183,7 +186,7 @@ class App:
         text = self.decode_queue.get()
         mtype = 'norm'
         mtype = 'cq' if 'CQ' in text else ('qso' if not '==' in text else mtype)
-        self.text_widget.insert(tk.INSERT, text, mtype)
+        self.text_widget.insert(tk.END, text, mtype)
         self.text_widget.see('end')
 
 app = App(tk.Tk())
