@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import time, pyaudio, threading, queue
 
 params = {'MIN_LLR_SD': 0.0,'HPS': 4, 'BPT':2,'SYM_RATE': 6.25,'SAMP_RATE': 12000, 'T_CYC':15, 'WFBOX_LIFETIME': 25,
-          'T_SEARCH_0': 4.6, 'T_SEARCH_1': 10.6, 'PAYLOAD_SYMBOLS': 79-7, 'LDPC_CONTROL': (45, 12) }
+          'T_SEARCH_0': 4.6, 'T_SEARCH_1': 10.6, 'PAYLOAD_SYMBOLS': 79-7, 'LDPC_CONTROL': (36, 6) }
 params.update({'H0_RANGE': [-7 * params['HPS'], int(3.48 * params['SYM_RATE'] * params['HPS'])]})
 
 call_hashes = {}
@@ -172,7 +172,7 @@ class AudioIn:
         self.stream = pyaudio.PyAudio().open(
             format = pyaudio.paInt16, channels=1, rate = params['SAMP_RATE'], input = True, input_device_index = indev,
             frames_per_buffer = int(params['SAMP_RATE'] / (params['SYM_RATE'] * params['HPS'])), stream_callback=self._callback,)
-        self.grid_main_ptr = int((time.time() % params['T_CYC']) * params['SYM_RATE']*params['HPS'])
+        self.set_pointer()
         self.stream.start_stream()
 
     def find_device(self, device_str_contains):
@@ -185,6 +185,9 @@ class AudioIn:
             if(match):
                 return dev_idx
         print(f"[Audio] No audio device found matching {device_str_contains}")
+
+    def set_pointer(self):
+        self.grid_main_ptr = int((time.time() % params['T_CYC']) * params['SYM_RATE']*params['HPS'])
 
     def _callback(self, in_data, frame_count, time_info, status_flags):
         samples = np.frombuffer(in_data, dtype=np.int16).astype(np.float32)
@@ -259,7 +262,7 @@ def cyclestart_str(t):
     cyclestart_time = params['T_CYC'] * int( t / params['T_CYC'] )
     return time.strftime("%y%m%d_%H%M%S", time.gmtime(cyclestart_time))
          
-def cycle_manager(audio_in, freq_range, on_decode, silent, waterfall):
+def cycle_manager(audio_in, freq_range, waterfall):
     ldpc = LdpcDecoder()
     nFreqs = audio_in.nFreqs
     dt = 1.0 / (params['SYM_RATE'] * params['HPS']) 
@@ -268,7 +271,7 @@ def cycle_manager(audio_in, freq_range, on_decode, silent, waterfall):
     base_payload_hops = np.array([params['HPS'] * s for s in payload_symb_idxs])
     hop_idxs_Costas =  np.arange(7) * params['HPS']
     base_freq_idxs = np.array([params['BPT'] // 2 + params['BPT'] * t for t in range(8)])
-    syncs = [{}] * nFreqs
+    syncs = {}
     origins_for_decode = [(0, 0)] * nFreqs
     csync = np.full((7, 8*params['BPT']), -1/7, np.float32)
     for sym_idx, tone in enumerate([3,1,4,0,6,5,2]):
@@ -277,80 +280,76 @@ def cycle_manager(audio_in, freq_range, on_decode, silent, waterfall):
         csync[sym_idx, 7 * params['BPT']:] = 0.0
     csync_flat =  csync.ravel()
     duplicates_filter = []
-    
-    while True:
-        # Search
-        delay = params['T_SEARCH_1'] - time.time() % params['T_CYC']
-        if (delay > 0): time.sleep(delay)
-        if (delay < 0): print(f"WARNING: decoding taking too long, delayed search by {-delay:5.1f} seconds")
 
-        if not silent:
-            print("=================================================")
-            print("Cycle         dt     nits Message")
-        origins_for_decode = [(0, 0)] * nFreqs
-        for fb in range(nFreqs - 8 * params['BPT']):
-            freq_idxs = fb + base_freq_idxs
-            p = audio_in.grid_main[:, fb:fb+8*params['BPT']]
-            syncs[fb] = {'h0_idx':0, 'score':0, 'dt': 0}
+    while True:
+
+        time.sleep(params['T_CYC'] - time.time() % params['T_CYC'])
+        t0_cyc = time.time()
+        cycle_start_str = cyclestart_str(t0_cyc + 1)
+        print(f"{cycle_start_str} =======================")
+        print(f"{t0_cyc % params['T_CYC']: 5.1f} Rollover")
+        audio_in.set_pointer()
+
+        # Search
+        time.sleep(params['T_SEARCH_1'])
+        print(f"{time.time() % params['T_CYC']: 5.1f} Start search")
+        for f0_idx in range(nFreqs - 8 * params['BPT']):
+            freq_idxs = f0_idx + base_freq_idxs
+            p = audio_in.grid_main[:, f0_idx:f0_idx+8*params['BPT']]
+            #p = 20*np.log10(p)
+            syncs[f0_idx] = {'score':0, 'h0_idx':0, 'dt': 0}
             for h0_idx in range(params['H0_RANGE'][0], params['H0_RANGE'][1]):
                 sync_score = float(np.dot(p[h0_idx + hop_idxs_Costas + 36 * params['HPS'], :].ravel(), csync_flat))
-                test_sync = {'h0_idx':h0_idx, 'score':sync_score, 'dt': h0_idx * dt - 0.7}
-                if test_sync['score'] > syncs[fb]['score']:
-                    syncs[fb] = test_sync
-                    origins_for_decode[fb] = (syncs[fb]['h0_idx'], fb)
+                test_sync = {'score':sync_score, 'h0_idx':h0_idx, 'dt': h0_idx * dt - 0.7}
+                if test_sync['score'] > syncs[f0_idx]['score']:
+                    syncs[f0_idx] = test_sync
+
+        f0_idxs = list(syncs.keys())
+        f0_idxs.sort(key = lambda f0_idx: syncs[f0_idx]['score'], reverse = True)
+
+        time.sleep(params['T_CYC'] - (time.time() - 14) % params['T_CYC'])
+        print(f"{time.time() % params['T_CYC']: 5.1f} Start decode")
         # Decode
         duplicates_filter = []
-        cs = cyclestart_str(time.time())
-        origins_for_decode.sort(key = lambda o: o[0])
-        while len(origins_for_decode):
-            origins_for_decode = [o for o in origins_for_decode if o[0] is not None]
-            for idx, origin in enumerate(origins_for_decode[:10]):
-                time.sleep(0.005)
-                
-                if 0 <=  (audio_in.grid_main_ptr - origin[0]) <= params['PAYLOAD_SYMBOLS'] * params['HPS']:
-                    continue
-                hops, freq_idxs = origin[0] + base_payload_hops, origin[1] + base_freq_idxs
-                p = audio_in.grid_main[np.ix_(hops, freq_idxs)]
-                llra = np.max(p[:, [4,5,6,7]], axis=1) - np.max(p[:, [0,1,2,3]], axis=1)
-                llrb = np.max(p[:, [2,3,4,7]], axis=1) - np.max(p[:, [0,1,5,6]], axis=1)
-                llrc = np.max(p[:, [1,2,6,7]], axis=1) - np.max(p[:, [0,3,4,5]], axis=1)
-                llr = np.column_stack((llra, llrb, llrc))
-                llr = llr.ravel() / 10
-                llr_sd = int(0.5+100*np.std(llr))/100.0
-                llr = 3.5 * llr / (llr_sd + 0.01)
-                llr = np.clip(llr, -3.7, 3.7)
-                if llr_sd > params['MIN_LLR_SD']:
-                    ldpc_it = 0
-                    ncheck = ldpc.calc_ncheck(llr)
-                    ncheck0 = ncheck
-                    if ncheck > 0:
-                        if ncheck <= params['LDPC_CONTROL'][0]:
-                            for ldpc_it in range(params['LDPC_CONTROL'][1]):
-                                llr, ncheck = ldpc.do_ldpc_iteration(llr)
-                                if(ncheck == 0):
-                                    break                    
-                    if ncheck == 0:
-                        bits91_int = 0
-                        for bit in (llr[:91] > 0).astype(int).tolist():
-                            bits91_int = (bits91_int << 1) | bit
-                        bits77_int = check_crc(bits91_int)
-                        if(bits77_int):
-                            msg = unpack(bits77_int)
-                            if(msg not in duplicates_filter):
-                                fb = origin[1]
-                                waterfall.post_decode(syncs[fb]['h0_idx'], fb, ' '.join(msg))
-                                duplicates_filter.append(msg)
-                                decode_dict = {'decoder': 'PyFT8', 'cs':cs, 'dt':syncs[fb]['dt'], 'f':0, 'sync_idx': 1, 'sync': syncs[fb],
-                                               'msg_tuple':msg, 'msg':' '.join(msg), 'ncheck0': 99,'snr': -30,'llr_sd':0,'decode_path':'' }
-                                if(on_decode):
-                                    on_decode(decode_dict)
-                                if(not silent):
-                                    print(f"{decode_dict['cs']} {decode_dict['sync']['dt']:+4.2f} {ldpc_it:3d} {' '.join(msg)}")
-                origins_for_decode[idx] = (None, None)
+        for f0_idx in f0_idxs[:100]:
+            time.sleep(0.005)
+            hops, freq_idxs = syncs[f0_idx]['h0_idx'] + base_payload_hops, f0_idx + base_freq_idxs
+            p = audio_in.grid_main[np.ix_(hops, freq_idxs)]
+            #p = 20*np.log10(p)
+            llra = np.max(p[:, [4,5,6,7]], axis=1) - np.max(p[:, [0,1,2,3]], axis=1)
+            llrb = np.max(p[:, [2,3,4,7]], axis=1) - np.max(p[:, [0,1,5,6]], axis=1)
+            llrc = np.max(p[:, [1,2,6,7]], axis=1) - np.max(p[:, [0,3,4,5]], axis=1)
+            llr = np.column_stack((llra, llrb, llrc))
+            llr = llr.ravel() / 10
+            llr_sd = int(0.5+100*np.std(llr))/100.0
+            llr = 3.5 * llr / (llr_sd + 0.01)
+            llr = np.clip(llr, -3.7, 3.7)
+            if llr_sd > params['MIN_LLR_SD']:
+                ldpc_it = 0
+                ncheck = ldpc.calc_ncheck(llr)
+                ncheck0 = ncheck
+                if ncheck > 0:
+                    if ncheck <= params['LDPC_CONTROL'][0]:
+                        for ldpc_it in range(params['LDPC_CONTROL'][1]):
+                            llr, ncheck = ldpc.do_ldpc_iteration(llr)
+                            if(ncheck == 0):
+                                break                    
+                if ncheck == 0:
+                    bits91_int = 0
+                    for bit in (llr[:91] > 0).astype(int).tolist():
+                        bits91_int = (bits91_int << 1) | bit
+                    bits77_int = check_crc(bits91_int)
+                    if(bits77_int):
+                        msg = unpack(bits77_int)
+                        if(msg not in duplicates_filter):
+                            waterfall.post_decode(syncs[f0_idx]['h0_idx'], f0_idx, ' '.join(msg))
+                            duplicates_filter.append(msg)
+                            print(f"{cycle_start_str} {syncs[f0_idx]['dt']:+4.2f} {ldpc_it:3d} {' '.join(msg)}")
+        print(f"{time.time() % params['T_CYC']: 5.1f} End decode")
 
 if __name__ == "__main__":
     audio_in = AudioIn(['Mic', 'CODEC'], 3100)
     waterfall = Waterfall(audio_in.grid_main, params)
-    threading.Thread(target = cycle_manager, args =(audio_in, [200, 3100], None, False, waterfall,), daemon=True ).start()
+    threading.Thread(target = cycle_manager, args =(audio_in, [200, 3100], waterfall,), daemon=True ).start()
     plt.show()  
 
