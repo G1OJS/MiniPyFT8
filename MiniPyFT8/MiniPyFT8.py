@@ -167,8 +167,7 @@ class AudioIn:
         self.fft_in = np.zeros(self.fft_len, dtype=np.float32)
         self.fft_window = fft_window=np.hanning(self.fft_len).astype(np.float32)
         self.hops_per_cycle = int(params['T_CYC'] * params['SYM_RATE'] * params['HPS'])
-        self.hops_per_grid = 2 * self.hops_per_cycle
-        self.grid_main = np.ones((self.hops_per_grid, self.nFreqs), dtype = np.float32)
+        self.grid_main = np.ones((self.hops_per_cycle, self.nFreqs), dtype = np.float32)
         indev = self.find_device(input_device_keywords)
         self.stream = pyaudio.PyAudio().open(
             format = pyaudio.paInt16, channels=1, rate = params['SAMP_RATE'], input = True, input_device_index = indev,
@@ -195,7 +194,7 @@ class AudioIn:
         np.multiply(self.audio_buffer, self.fft_window, out=self.fft_in)
         z = np.fft.rfft(self.fft_in)[:self.nFreqs]
         self.grid_main[self.grid_main_ptr, :] = z.real*z.real + z.imag*z.imag
-        self.grid_main_ptr = (self.grid_main_ptr + 1) % self.hops_per_grid
+        self.grid_main_ptr = (self.grid_main_ptr + 1) % self.hops_per_cycle
         return (None, pyaudio.paContinue)
 
 # ================== WATERFALL ======================================================
@@ -284,8 +283,7 @@ def cycle_manager(audio_in, freq_range, on_decode, silent, waterfall):
         delay = params['T_SEARCH_1'] - time.time() % params['T_CYC']
         if (delay > 0): time.sleep(delay)
         if (delay < 0): print(f"WARNING: decoding taking too long, delayed search by {-delay:5.1f} seconds")
-        cycle = audio_in.grid_main_ptr // audio_in.hops_per_cycle
-        cycle_h0 = cycle * audio_in.hops_per_cycle
+
         if not silent:
             print("=================================================")
             print("Cycle         dt     nits Message")
@@ -294,7 +292,7 @@ def cycle_manager(audio_in, freq_range, on_decode, silent, waterfall):
             freq_idxs = fb + base_freq_idxs
             p = audio_in.grid_main[:, fb:fb+8*params['BPT']]
             syncs[fb] = {'h0_idx':0, 'score':0, 'dt': 0}
-            for h0_idx in range(cycle_h0 + params['H0_RANGE'][0], cycle_h0 + params['H0_RANGE'][1]):
+            for h0_idx in range(params['H0_RANGE'][0], params['H0_RANGE'][1]):
                 sync_score = float(np.dot(p[h0_idx + hop_idxs_Costas + 36 * params['HPS'], :].ravel(), csync_flat))
                 test_sync = {'h0_idx':h0_idx, 'score':sync_score, 'dt': h0_idx * dt - 0.7}
                 if test_sync['score'] > syncs[fb]['score']:
@@ -308,8 +306,8 @@ def cycle_manager(audio_in, freq_range, on_decode, silent, waterfall):
             origins_for_decode = [o for o in origins_for_decode if o[0] is not None]
             for idx, origin in enumerate(origins_for_decode[:10]):
                 time.sleep(0.005)
-                ptr_rel_to_h0 = (audio_in.grid_main_ptr - origin[0]) % audio_in.hops_per_grid
-                if 0 <=  ptr_rel_to_h0 <= params['PAYLOAD_SYMBOLS'] * params['HPS']:
+                
+                if 0 <=  (audio_in.grid_main_ptr - origin[0]) <= params['PAYLOAD_SYMBOLS'] * params['HPS']:
                     continue
                 hops, freq_idxs = origin[0] + base_payload_hops, origin[1] + base_freq_idxs
                 p = audio_in.grid_main[np.ix_(hops, freq_idxs)]
