@@ -158,17 +158,17 @@ class App:
         
         self.text_widget.tag_config('to_me', foreground = 'white', background = 'red', font=('Helvetica', 12, 'bold'))
         self.text_widget.tag_config('cq', foreground = 'white', background = 'green', font=('Helvetica', 12, 'bold'))
-        self.text_widget.tag_config('norm', foreground = 'white', background = 'blue', font=('Helvetica', 12))
+        self.text_widget.tag_config('norm', foreground = 'black', background = 'white', font=('Helvetica', 12))
+        self.text_widget.tag_config('qso', foreground = 'white', background = 'blue', font=('Helvetica', 12))
+        self.text_widget.bind('<Button-1>', self.row_click)
 
         self.scrollbar.config(command=self.text_widget.yview)
         self.container.pack() 
         self.root.bind("<<received_decode>>", self.received_decode)
         threading.Thread(target = self.monitor_socket, daemon = True).start()
 
-    def set_colours(self):
-        self.text_widget.tag_config('to_me', foreground = 'white', background = 'red', font=('Helvetica', 12, 'bold'))
-        self.text_widget.tag_config('cq', foreground = 'white', background = 'green', font=('Helvetica', 12, 'bold'))
-        self.text_widget.tag_config('norm', foreground = 'white', background = 'blue', font=('Helvetica', 12))
+    def row_click(self, e):
+        print(e)
 
     def monitor_socket(self):
         while True:
@@ -181,11 +181,10 @@ class App:
 
     def received_decode(self, e):
         text = self.decode_queue.get()
-        self.text_widget.insert(tk.INSERT, text, 'cq' if 'CQ' in text else 'norm')
-
-
-        
-
+        mtype = 'norm'
+        mtype = 'cq' if 'CQ' in text else ('qso' if not '==' in text else mtype)
+        self.text_widget.insert(tk.INSERT, text, mtype)
+        self.text_widget.see('end')
 
 app = App(tk.Tk())
 app.root.mainloop()

@@ -7,6 +7,14 @@ params.update({'H0_RANGE': [-7 * params['HPS'], int(3.48 * params['SYM_RATE'] * 
 
 call_hashes = {}
 
+sock = None
+def send_udp(info):
+    global sock
+    if sock is None:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.connect(('localhost', 2121))
+    sock.send(info.encode())
+
 def add_call_hashes(call):
     global call_hashes
     chars = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/"
@@ -246,7 +254,7 @@ class AudioIn:
                
 class DecodeManager:
     def __init__(self):
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        #self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.decode_queue = queue.Queue()
         self.duplicate_filter = []
         threading.Thread(target = self.run, daemon=True ).start()
@@ -268,8 +276,7 @@ class DecodeManager:
                     self.duplicate_filter.append(msg)
                     self.n_decodes += 1
                     info = f"{self.n_decodes:4d} {time.time() % 15:5.2f} {sync['fHz']:7.2f} {sync['dt']:+04.2f} {sync['score']:+07.1f} {' '.join(msg)}"
-                    self.sock.connect(('localhost', 2121))
-                    self.sock.send(info.encode())
+                    send_udp(info)
 
 class Receiver:
     def __init__(self):
@@ -296,9 +303,9 @@ class Receiver:
             t0_cyc = time.time()
             self.audio_in.set_pointer()
             time.sleep(params['T_SEARCH_1'])
-
             cycle_start_str = time.strftime("%y%m%d_%H%M%S", time.gmtime(t0_cyc))
-            print(f"{cycle_start_str} ========================================")
+            info = f"{cycle_start_str} ========================================"
+            send_udp(info)
             for f0_idx in range(nFreqs - 8 * params['BPT']):
                 freq_idxs = f0_idx + base_freq_idxs
                 p = self.audio_in.grid_main[:, f0_idx:f0_idx+8*params['BPT']]
@@ -322,7 +329,7 @@ class Receiver:
                     p = 20*np.log10(p)
                     self.decode_manager.put((syncs[f0_idx].copy(), p))
                     syncs[f0_idx]['score'] = -1
-                
+
 if __name__ == "__main__":
     rx = Receiver()
  
