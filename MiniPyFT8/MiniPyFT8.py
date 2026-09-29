@@ -168,12 +168,12 @@ class AudioIn:
         self.fft_window = fft_window=np.hanning(self.fft_len).astype(np.float32)
         self.hops_per_cycle = int(params['T_CYC'] * params['SYM_RATE'] * params['HPS'])
         self.hops_per_grid = 2 * self.hops_per_cycle
-        self.dBgrid_main = np.ones((self.hops_per_grid, self.nFreqs), dtype = np.float32)
+        self.grid_main = np.ones((self.hops_per_grid, self.nFreqs), dtype = np.float32)
         indev = self.find_device(input_device_keywords)
         self.stream = pyaudio.PyAudio().open(
             format = pyaudio.paInt16, channels=1, rate = params['SAMP_RATE'], input = True, input_device_index = indev,
             frames_per_buffer = int(params['SAMP_RATE'] / (params['SYM_RATE'] * params['HPS'])), stream_callback=self._callback,)
-        self.dBgrid_main_ptr = int(cycle_time() * params['SYM_RATE']*params['HPS'])
+        self.grid_main_ptr = int((time.time() % params['T_CYC']) * params['SYM_RATE']*params['HPS'])
         self.stream.start_stream()
 
     def find_device(self, device_str_contains):
@@ -194,8 +194,8 @@ class AudioIn:
         self.audio_buffer[-ns:] = samples
         np.multiply(self.audio_buffer, self.fft_window, out=self.fft_in)
         z = np.fft.rfft(self.fft_in)[:self.nFreqs]
-        self.dBgrid_main[self.dBgrid_main_ptr, :] = 10*np.log10(z.real*z.real + z.imag*z.imag + 1e-12)
-        self.dBgrid_main_ptr = (self.dBgrid_main_ptr + 1) % self.hops_per_grid
+        self.grid_main[self.grid_main_ptr, :] = z.real*z.real + z.imag*z.imag
+        self.grid_main_ptr = (self.grid_main_ptr + 1) % self.hops_per_grid
         return (None, pyaudio.paContinue)
 
 # ================== WATERFALL ======================================================
@@ -215,9 +215,9 @@ class FT8Box:
         self.modified = time.time()
 
 class Waterfall:
-    def __init__(self, dBgrid, params):
+    def __init__(self, grid, params):
         from matplotlib.animation import FuncAnimation
-        self.dBgrid = dBgrid
+        self.grid = grid
         self.params = params
         self.boxes = []
         self.decode_queue = queue.Queue()
@@ -225,7 +225,7 @@ class Waterfall:
         self.fig.suptitle("G1OJS MiniPyFT8 with LDPC in ~ 300 lines")
         plt.tight_layout()
         self.ax.set_axis_off()
-        self.image = self.ax.imshow(self.dBgrid.T,vmax=120,vmin=90,origin='lower',interpolation='none')
+        self.image = self.ax.imshow(self.grid.T,origin='lower',interpolation='none')
         self.ani = FuncAnimation(self.fig,self._animate,interval=40,frames=(100000), blit=True)
 
     def tidy(self):
@@ -239,7 +239,7 @@ class Waterfall:
         self.decode_queue.put((tbin, fbin, text))
 
     def _animate(self, frame):
-        self.image.set_data(self.dBgrid.T)
+        self.image.set_data(self.grid.T)
         while not self.decode_queue.empty():
             tbin, fbin, text = self.decode_queue.get()
             self._add_or_update_box(tbin, fbin, text)
@@ -255,8 +255,6 @@ class Waterfall:
         self.boxes.append(FT8Box(self.ax, tbin, fbin, text))
                 
 # ================== CYCLE MANAGER ======================================================
-def cycle_time():
-    return time.time() % params['T_CYC']
 
 def cyclestart_str(t):
     cyclestart_time = params['T_CYC'] * int( t / params['T_CYC'] )
@@ -283,21 +281,21 @@ def cycle_manager(audio_in, freq_range, on_decode, silent, waterfall):
     
     while True:
         # Search
-        delay = params['T_SEARCH_1'] - cycle_time()
+        delay = params['T_SEARCH_1'] - time.time() % params['T_CYC']
         if (delay > 0): time.sleep(delay)
         if (delay < 0): print(f"WARNING: decoding taking too long, delayed search by {-delay:5.1f} seconds")
-        cycle = audio_in.dBgrid_main_ptr // audio_in.hops_per_cycle
+        cycle = audio_in.grid_main_ptr // audio_in.hops_per_cycle
         cycle_h0 = cycle * audio_in.hops_per_cycle
         if not silent:
             print("=================================================")
-            print("Cycle         Time dt     sy nits Sigma Message")
+            print("Cycle         dt     nits Message")
         origins_for_decode = [(0, 0)] * nFreqs
         for fb in range(nFreqs - 8 * params['BPT']):
             freq_idxs = fb + base_freq_idxs
-            p_dB = audio_in.dBgrid_main[:, fb:fb+8*params['BPT']]
+            p = audio_in.grid_main[:, fb:fb+8*params['BPT']]
             syncs[fb] = {'h0_idx':0, 'score':0, 'dt': 0}
             for h0_idx in range(cycle_h0 + params['H0_RANGE'][0], cycle_h0 + params['H0_RANGE'][1]):
-                sync_score = float(np.dot(p_dB[h0_idx + hop_idxs_Costas + 36 * params['HPS'], :].ravel(), csync_flat))
+                sync_score = float(np.dot(p[h0_idx + hop_idxs_Costas + 36 * params['HPS'], :].ravel(), csync_flat))
                 test_sync = {'h0_idx':h0_idx, 'score':sync_score, 'dt': h0_idx * dt - 0.7}
                 if test_sync['score'] > syncs[fb]['score']:
                     syncs[fb] = test_sync
@@ -310,12 +308,11 @@ def cycle_manager(audio_in, freq_range, on_decode, silent, waterfall):
             origins_for_decode = [o for o in origins_for_decode if o[0] is not None]
             for idx, origin in enumerate(origins_for_decode[:10]):
                 time.sleep(0.005)
-                ptr_rel_to_h0 = (audio_in.dBgrid_main_ptr - origin[0]) % audio_in.hops_per_grid
+                ptr_rel_to_h0 = (audio_in.grid_main_ptr - origin[0]) % audio_in.hops_per_grid
                 if 0 <=  ptr_rel_to_h0 <= params['PAYLOAD_SYMBOLS'] * params['HPS']:
                     continue
                 hops, freq_idxs = origin[0] + base_payload_hops, origin[1] + base_freq_idxs
-                p_dB = audio_in.dBgrid_main[np.ix_(hops, freq_idxs)]
-                p = np.clip(p_dB - np.max(p_dB), -80, 0)
+                p = audio_in.grid_main[np.ix_(hops, freq_idxs)]
                 llra = np.max(p[:, [4,5,6,7]], axis=1) - np.max(p[:, [0,1,2,3]], axis=1)
                 llrb = np.max(p[:, [2,3,4,7]], axis=1) - np.max(p[:, [0,1,5,6]], axis=1)
                 llrc = np.max(p[:, [1,2,6,7]], axis=1) - np.max(p[:, [0,3,4,5]], axis=1)
@@ -346,16 +343,16 @@ def cycle_manager(audio_in, freq_range, on_decode, silent, waterfall):
                                 waterfall.post_decode(syncs[fb]['h0_idx'], fb, ' '.join(msg))
                                 duplicates_filter.append(msg)
                                 decode_dict = {'decoder': 'PyFT8', 'cs':cs, 'dt':syncs[fb]['dt'], 'f':0, 'sync_idx': 1, 'sync': syncs[fb],
-                                               'msg_tuple':msg, 'msg':' '.join(msg), 'ncheck0': 99,'snr': -30,'llr_sd':0,'decode_path':'','td': cycle_time() }
+                                               'msg_tuple':msg, 'msg':' '.join(msg), 'ncheck0': 99,'snr': -30,'llr_sd':0,'decode_path':'' }
                                 if(on_decode):
                                     on_decode(decode_dict)
                                 if(not silent):
-                                    print(f"{decode_dict['cs']} {decode_dict['td']:4.2f} {decode_dict['sync']['dt']:+4.2f} {decode_dict['sync_idx']:3d} {ldpc_it:3d} {llr_sd:5.2f}  {' '.join(msg)}")
+                                    print(f"{decode_dict['cs']} {decode_dict['sync']['dt']:+4.2f} {ldpc_it:3d} {' '.join(msg)}")
                 origins_for_decode[idx] = (None, None)
 
 if __name__ == "__main__":
     audio_in = AudioIn(['Mic', 'CODEC'], 3100)
-    waterfall = Waterfall(audio_in.dBgrid_main, params)
+    waterfall = Waterfall(audio_in.grid_main, params)
     threading.Thread(target = cycle_manager, args =(audio_in, [200, 3100], None, False, waterfall,), daemon=True ).start()
     plt.show()  
 
