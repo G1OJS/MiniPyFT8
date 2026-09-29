@@ -1,5 +1,5 @@
 import tkinter as tk
-import tkinter.scrolledtext as st
+from tkinter import ttk
 import time, threading, socket, queue
 from MiniPyFT8.receiver import Receiver
 from PyFT8.transmitter import get_ft8_symbols, symbols_to_audio_bytes
@@ -150,14 +150,25 @@ class App:
         self.rx = Receiver()
         self.decode_queue = queue.Queue()
         self.root = root
-        self.frame = tk.Frame(self.root, bd = 2, bg = 'lightgrey')
-        self.frame.pack(padx=1, pady=1, side='left', fill='both', expand=True)
-        self.frm_decodes = tk.Frame(self.frame, bd = 2, bg = 'lightgrey', width = 600, height = 400)
-        self.frm_decodes.pack(padx=1, pady=1, side='left', fill='both', expand=True)
-        self.scrl_decodes = st.ScrolledText(self.frm_decodes)
-        self.scrl_decodes.pack()
+        self.container = ttk.Frame(self.root) 
+        self.scrollbar = ttk.Scrollbar(self.container)
+        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.text_widget = tk.Text(self.container, wrap=tk.WORD, yscrollcommand=self.scrollbar.set)
+        self.text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        self.text_widget.tag_config('to_me', foreground = 'white', background = 'red', font=('Helvetica', 12, 'bold'))
+        self.text_widget.tag_config('cq', foreground = 'white', background = 'green', font=('Helvetica', 12, 'bold'))
+        self.text_widget.tag_config('norm', foreground = 'white', background = 'blue', font=('Helvetica', 12))
+
+        self.scrollbar.config(command=self.text_widget.yview)
+        self.container.pack() 
         self.root.bind("<<received_decode>>", self.received_decode)
         threading.Thread(target = self.monitor_socket, daemon = True).start()
+
+    def set_colours(self):
+        self.text_widget.tag_config('to_me', foreground = 'white', background = 'red', font=('Helvetica', 12, 'bold'))
+        self.text_widget.tag_config('cq', foreground = 'white', background = 'green', font=('Helvetica', 12, 'bold'))
+        self.text_widget.tag_config('norm', foreground = 'white', background = 'blue', font=('Helvetica', 12))
 
     def monitor_socket(self):
         while True:
@@ -165,13 +176,12 @@ class App:
             decode_text, addres = self.sock.recvfrom(1024)
             decode_text = decode_text.decode()
             if decode_text:
-                print(decode_text)
                 self.decode_queue.put(f"{decode_text}\n")
                 self.root.after(0, lambda: self.root.event_generate("<<received_decode>>"))
 
     def received_decode(self, e):
         text = self.decode_queue.get()
-        self.scrl_decodes.insert(tk.INSERT, text)
+        self.text_widget.insert(tk.INSERT, text, 'cq' if 'CQ' in text else 'norm')
 
 
         
