@@ -42,11 +42,12 @@ class App:
         self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.text_widget = tk.Text(self.container, wrap=tk.WORD, yscrollcommand=self.scrollbar.set)
         self.text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        
-        self.text_widget.tag_config('to_me', foreground = 'white', background = 'red', font=('Helvetica', 12, 'bold'))
+
+        self.text_widget.tag_config('norm', foreground = 'white', background = 'blue', font=('Helvetica', 12))
+        self.text_widget.tag_config('info', foreground = 'black', background = 'white', font=('Helvetica', 12))
         self.text_widget.tag_config('cq', foreground = 'white', background = 'green', font=('Helvetica', 12, 'bold'))
-        self.text_widget.tag_config('norm', foreground = 'black', background = 'white', font=('Helvetica', 12))
-        self.text_widget.tag_config('qso', foreground = 'white', background = 'blue', font=('Helvetica', 12))
+        self.text_widget.tag_config('to_me', foreground = 'white', background = 'red', font=('Helvetica', 12, 'bold'))        
+        self.text_widget.tag_config('from_me', foreground = 'black', background = 'yellow', font=('Helvetica', 12, 'bold'))
         self.text_widget.bind('<Button-1>', self.row_click)
 
         self.scrollbar.config(command=self.text_widget.yview)
@@ -90,8 +91,8 @@ class App:
 
     def received_decode(self, e):
         text = self.decode_queue.get()
-        mtype = 'norm'
-        mtype = 'cq' if 'CQ' in text else ('qso' if not '==' in text else mtype)
+        idx = 1 * ("==" in text) + 2 * text.startswith("CQ") + 3* text.startswith(myCall) +4 * (text.split(' ')[1] == myCall)
+        mtype = ['norm','info', 'cq','to_me','from_me'][idx]
         self.text_widget.insert(tk.END, text, mtype)
         self.text_widget.see('end')
 

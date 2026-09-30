@@ -231,26 +231,28 @@ class Transmitter:
 
     def set_transmit_payload(self, message):
         print(f"{time.time() % 30} set tx payload {message}")
-        odd_even = int(((time.time() + T_CYC - MAX_TX_START_CYCLETIME) % (2 * T_CYC)) / (2 * T_CYC))
-        if len(message.split(' ')) == 3:           
-            symbols = get_ft8_symbols(message, self.get_call_hashes, self.add_call_hashes)
-            audio_bytes = symbols_to_audio_bytes(symbols, f_base = self.tx_freq)
-        self.tx_payload = {'audio_bytes':audio_bytes, 'odd_even':odd_even}
-        
+        if len(message.split(' ')) == 3:
+            mtx = MAX_TX_START_CYCLETIME
+            ct = time.time() % 15
+            delay = -1
+            if ct < mtx:
+                delay =  0
+            if ct > T_CYC - mtx:
+                delay = T_CYC - ct
+            if delay >= 0:
+                time.sleep(delay)
+                symbols = get_ft8_symbols(message, self.get_call_hashes, self.add_call_hashes)
+                audio_bytes = symbols_to_audio_bytes(symbols, f_base = self.tx_freq)
+                self.tx_payload = audio_bytes
         
     def transmit_daemon(self):
         while True:
             time.sleep(0.1)
             if self.tx_payload is not None:
-                t_start = [0.5, 15.5][self.tx_payload['odd_even']]
-                t_delay = (t_start - time.time() % (2*T_CYC)) % T_CYC
-                print(f"{time.time() % 30} t_delay = {t_delay}")
-                time.sleep(t_delay)
-                grid_time = time.time() % (2 * T_CYC)
                 print(f"{time.time() % 30} transmit")
                 self.rig.ptt_on()
                 self.transmitting = True
-                self.soundcard_out.transmit_audio_data_bytes(self.tx_payload['audio_bytes'])
+                self.soundcard_out.transmit_audio_data_bytes(self.tx_payload)
                 self.rig.ptt_off()
                 self.transmitting = False
                 self.tx_payload = None

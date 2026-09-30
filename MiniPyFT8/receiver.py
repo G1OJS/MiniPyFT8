@@ -290,6 +290,7 @@ class Receiver:
             csync[sym_idx, fbins] = 1.0
             csync[sym_idx, 7 * params['BPT']:] = 0.0
         csync_flat =  csync.ravel()
+        send_udp("Receiver starting")
 
         while True:
             t0_cyc = time.time()
