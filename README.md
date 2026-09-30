@@ -8,6 +8,7 @@ This is really a 'toy' decoder/transceiver, but it illustrates what can be done 
  - Receiver ~ 300 lines
  - Transmitter ~ 300 lines
  - Tkinter GUI ~ 100 lines
+
 That's an FT8 transmitter / receiver in about 700 lines of Python, including LDPC decoding.
 
 If you want to use it to transmit, please edit myCall and myGrid in tk_tcvr.py to reflect your own details! I'll come back soon and add entry boxes for these, and a CQ button ...
