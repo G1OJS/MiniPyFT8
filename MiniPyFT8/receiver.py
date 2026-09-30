@@ -2,8 +2,8 @@ import numpy as np
 import time, pyaudio, threading, queue, socket, json
 
 params = {'HPS': 4, 'BPT':2,'SYM_RATE': 6.25,'SAMP_RATE': 12000,
-          'T_SEARCH_0': 4.6, 'T_SEARCH_1': 10.6, 'PAYLOAD_SYMBOLS': 79-7, 'LDPC_CONTROL': (40, 15) }
-params.update({'H0_RANGE': [-7 * params['HPS'], int(3.48 * params['SYM_RATE'] * params['HPS'])]})
+          'T_SEARCH_0': 4.6, 'T_SEARCH_1': 10.6, 'PAYLOAD_SYMBOLS': 79-7, 'LDPC_CONTROL': (35, 12) }
+params.update({'H0_RANGE': [0, int(3.6 * params['SYM_RATE'] * params['HPS'])]})
 
 call_hashes = {}
 def add_call_hash(call):
@@ -218,6 +218,8 @@ class AudioIn:
         self.stream.start_stream()
 
     def find_device(self, device_str_contains):
+        if isinstance(device_str_contains, str):
+            device_str_contains = device_str_contains.split(',')
         pya = pyaudio.PyAudio()
         for dev_idx in range(pya.get_device_count()):
             name = pya.get_device_info_by_index(dev_idx)['name']
@@ -263,15 +265,16 @@ class Receiver:
 
     def decode_manager(self):
         while True:
-            time.sleep(0.001)
+            time.sleep(0.01)
             if not self.decode_queue.empty():
                 sync, p = self.decode_queue.get()
                 msg_tuple = decode(p)
                 if msg_tuple and not msg_tuple in self.duplicate_filter:
                     their_snr = np.clip(int((np.max(p) - np.min(p))/2) - 58, -24, 24)
                     self.duplicate_filter.append(msg_tuple)
-                    self.send_output({'mtype':'decode', 'fHz':f"{sync['fHz']:7.2f}", 'dt':f"{sync['dt']:+04.2f}",
-                              'their_snr':f"{their_snr:+03d}", 'msg_tuple':msg_tuple})
+                    self.send_output({'mtype':'decode', 'cyclestart_string': sync['cs'],
+                                      'fHz':f"{sync['fHz']:7.2f}", 'dt':f"{sync['dt']:+04.2f}",
+                                      'their_snr':f"{their_snr:+03d}", 'msg_tuple':msg_tuple})
         
     def cycle_manager(self):
         nFreqs = self.audio_in.nFreqs
@@ -288,6 +291,9 @@ class Receiver:
             csync[sym_idx, 7 * params['BPT']:] = 0.0
         csync_flat =  csync.ravel()
         self.send_output({'mtype':'info', 'info':'Receiver starting'})
+        
+        while time.time() % 15 > 0.5:
+            time.sleep(0.1)
 
         while True:
             t0_cyc = 15 * int(time.time() / 15)
@@ -296,7 +302,8 @@ class Receiver:
             cycle_start_str = time.strftime("%y%m%d_%H%M%S", time.gmtime(t0_cyc))
             info = f"{cycle_start_str} ========================================"
             self.send_output({'mtype':'rollover', 'info':info})
-            for f0_idx in range(nFreqs - 8 * params['BPT']):
+            for f0_idx in range(int(100 / 3.125), nFreqs - 8 * params['BPT'], 1):
+                time.sleep(0)
                 freq_idxs = f0_idx + base_freq_idxs
                 p = self.audio_in.grid_main[:, f0_idx:f0_idx+8*params['BPT']]
                 p = 20*np.log10(p)
@@ -308,11 +315,16 @@ class Receiver:
                     if test_sync['score'] > syncs[f0_idx]['score']:
                         syncs[f0_idx] = test_sync
 
+            while not self.decode_queue.empty():
+                self.decode_queue.get()
+            t = time.time() % 15
             self.duplicate_filter = []
-            while time.time() % 15 < 14.5:
-                time.sleep(0.05)
+            print(f"{t:7.2f} start decode")
+            while time.time() % 15 > t:
+                time.sleep(0.1)
                 hop_ptr = self.audio_in.grid_main_ptr
-                f0_idxs = [f for f in list(syncs.keys()) if syncs[f]['score'] > 200 and hop_ptr > syncs[f]['hn_idx']]
+                f0_idxs = [f for f in list(syncs.keys()) if syncs[f]['score'] > 100
+                           and (hop_ptr > syncs[f]['hn_idx'] or hop_ptr < syncs[f]['h0_idx'])]
                 for f0_idx in f0_idxs:
                     hops, freq_idxs = syncs[f0_idx]['h0_idx'] + base_payload_hops, f0_idx + base_freq_idxs
                     p = self.audio_in.grid_main[np.ix_(hops, freq_idxs)]
@@ -320,7 +332,8 @@ class Receiver:
                     self.decode_queue.put((syncs[f0_idx].copy(), p))
                     syncs[f0_idx]['score'] = -1
 
+        
 if __name__ == "__main__":
-    rx = Receiver(mic_keywords = ['Mic', 'CODEC'], max_freq = 3100, output = 'print')
+    rx = Receiver(mic_keywords = ['Mic', 'CODEC'], max_freq = 2900, output = 'print')
  
 

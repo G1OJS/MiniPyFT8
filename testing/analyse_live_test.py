@@ -1,0 +1,80 @@
+import numpy as np
+import os
+
+def plot_staircase(defs):
+    import matplotlib.pyplot as plt
+    from matplotlib.ticker import AutoMinorLocator, MultipleLocator
+    fig, ax = plt.subplots(figsize = (9,9))
+    ax.yaxis.set_label_position("right")
+    ax.xaxis.set_major_locator(MultipleLocator(15))
+    ax.xaxis.set_minor_locator(MultipleLocator(1))
+    ax.yaxis.set_major_locator(MultipleLocator(100))
+    ax.yaxis.set_minor_locator(MultipleLocator(25))
+    plt.grid(which = 'major', axis = 'x')
+    plt.grid(which = 'major', axis = 'y')
+    ax.yaxis.tick_right()
+    ax.set_xlabel("Time, seconds")
+    ax.set_ylabel("Cumulative decodes (unique per cycle)")
+    fig.suptitle("Cumulative decode count against time\nPyFT8 vs WSJT-x")
+
+    for d in defs:
+        if os.path.exists(d[0]):
+            offset = d[3]
+            with open(d[0], 'r') as f:
+                lines = f.readlines()
+                times = [float(l.split()[2]) - offset for l in lines]
+                ax.plot(times, np.array(range(len(times))), label = d[1], color = d[2], marker = 'o', markersize = 3)
+    ax.legend()
+    plt.show()
+
+def list_methods(file):
+    with open(file, 'r') as f:
+        lines = f.readlines()
+
+    counter = {}
+    for l in lines:
+        cat = l.split()[3]
+        if cat not in counter:
+            counter[cat]=0
+        counter[cat] +=1
+
+    def sortorder(cv):
+        v = 0
+        if 'grid' in cv[0]: v += 10000
+        if 'CH' in cv[0]: v +=  9000
+        if 'CQ' in cv[0]: v +=  8000
+        if 'LDPC_OSD' in cv[0]: v -= 100000
+        v += cv[1]
+        return v
+
+    catvals = []
+    for c in counter.keys():
+        catvals.append((c, counter[c]))
+    catvals.sort(key = lambda cv: -sortorder(cv))
+
+    print(f"\nBreakdown for '{file}'")
+    for l in catvals:
+        print(f"{l[0]:30s} {l[1]:>3d}")
+    print(f"{'Total':>30s} {len(lines)}")
+    print(f"{'Total GOOD91':>30s} {np.sum([cv[1] for cv in catvals if 'GOOD91' in cv[0]])}")
+    print(f"{'Total LDPC':>30s} {np.sum([cv[1] for cv in catvals if 'LDPC' in cv[0] and not 'OSD' in cv[0]])}")
+    print(f"{'Total OSD':>30s} {np.sum([cv[1] for cv in catvals if 'OSD' in cv[0]])}")
+    print(f"{'Total CH':>30s} {np.sum([cv[1] for cv in catvals if '_CH' in cv[0]])}")
+    print(f"{'Total CQ':>30s} {np.sum([cv[1] for cv in catvals if '_CQ' in cv[0]])}")
+    print(f"{'Total RR':>30s} {np.sum([cv[1] for cv in catvals if '_RR' in cv[0]])}")
+    print(f"{'Total grid':>30s} {np.sum([cv[1] for cv in catvals if 'grid' in cv[0]])}")
+    print(f"{'Total fine':>30s} {np.sum([cv[1] for cv in catvals if 'fine' in cv[0]])}")
+
+
+
+#list_methods('PyFT8_8_28_baseline.txt')
+#list_methods('PyFT8.txt')
+
+plot_staircase([('MiniPyFT8_8_28_baseline.txt', 'PyFT8', 'orange', 15),
+                ('MiniPyFT8.txt', 'PyFT8', 'green', 0),  
+                ('WSJTx302_8_28_FAST.txt', 'WSJT-x_3.0.2_FAST', 'blue', 0),
+                ('WSJTx302_8_28_NORM.txt', 'WSJT-x_3.0.2_NORM', 'purple', 0)])
+
+
+
+
