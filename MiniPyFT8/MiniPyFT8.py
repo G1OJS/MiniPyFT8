@@ -1,8 +1,8 @@
 import tkinter as tk
 from tkinter import ttk
 import time, threading, socket, queue, json
-from MiniPyFT8.receiver import Receiver
-from MiniPyFT8.transmitter import Transmitter
+from receiver import Receiver
+from transmitter import Transmitter
 
 MAX_TX_START_CYCLETIME = 3
 
@@ -31,7 +31,6 @@ class App:
         self.call_hashes = {}
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind(('', 2121))
-        self.rig = Rig_hamlib()
         self.rx = Receiver()
         self.tx = Transmitter(self.rx.get_call_hashes, self.rx.add_call_hashes)
         self.decode_queue = queue.Queue()

@@ -1,6 +1,6 @@
 import numpy as np
 import wave, sys, pyaudio, time, threading
-from MiniPyFT8.rigctrl import Rig_hamlib
+from rigctrl import Rig_hamlib
 
 SAMP_RATE = 12000
 SYM_RATE  = 6.25
