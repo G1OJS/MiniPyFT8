@@ -1,5 +1,5 @@
 import numpy as np
-import time, pyaudio, threading, queue, socket
+import time, pyaudio, threading, queue, socket, json
 
 params = {'MIN_LLR_SD': 0.0,'HPS': 4, 'BPT':2,'SYM_RATE': 6.25,'SAMP_RATE': 12000, 'WFBOX_LIFETIME': 25,
           'T_SEARCH_0': 4.6, 'T_SEARCH_1': 10.6, 'PAYLOAD_SYMBOLS': 79-7, 'LDPC_CONTROL': (40, 15) }
@@ -8,12 +8,12 @@ params.update({'H0_RANGE': [-7 * params['HPS'], int(3.48 * params['SYM_RATE'] * 
 call_hashes = {}
 
 sock = None
-def send_udp(info):
+def send_udp(msg_dict):
     global sock
     if sock is None:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.connect(('localhost', 2121))
-    sock.send(info.encode())
+    sock.send(json.dumps(msg_dict).encode('utf-8'))
 
 def add_call_hashes(call):
     global call_hashes
@@ -271,10 +271,12 @@ class Receiver:
             time.sleep(0.001)
             if not self.decode_queue.empty():
                 sync, p = self.decode_queue.get()
-                msg = decode(p)
-                if msg and not msg in self.duplicate_filter:
-                    self.duplicate_filter.append(msg)
-                    send_udp(f"fHz,{sync['fHz']:7.2f},dt,{sync['dt']:+04.2f},msg,{','.join(msg)}")
+                msg_tuple = decode(p)
+                if msg_tuple and not msg_tuple in self.duplicate_filter:
+                    their_snr = np.clip(int((np.max(p) - np.min(p))/2) - 58, -24, 24)
+                    self.duplicate_filter.append(msg_tuple)
+                    send_udp({'mtype':'decode', 'fHz':f"{sync['fHz']:7.2f}", 'dt':f"{sync['dt']:+04.2f}",
+                              'their_snr':f"{their_snr:+03d}", 'msg_tuple':msg_tuple})
         
     def cycle_manager(self):
         nFreqs = self.audio_in.nFreqs
@@ -290,7 +292,7 @@ class Receiver:
             csync[sym_idx, fbins] = 1.0
             csync[sym_idx, 7 * params['BPT']:] = 0.0
         csync_flat =  csync.ravel()
-        send_udp("Receiver starting")
+        send_udp({'mtype':'info', 'info':'Receiver starting'})
 
         while True:
             t0_cyc = time.time()
@@ -298,7 +300,7 @@ class Receiver:
             time.sleep(params['T_SEARCH_1'])
             cycle_start_str = time.strftime("%y%m%d_%H%M%S", time.gmtime(t0_cyc))
             info = f"{cycle_start_str} ========================================"
-            send_udp(info)
+            send_udp({'mtype':'rollover', 'info':info})
             for f0_idx in range(nFreqs - 8 * params['BPT']):
                 freq_idxs = f0_idx + base_freq_idxs
                 p = self.audio_in.grid_main[:, f0_idx:f0_idx+8*params['BPT']]

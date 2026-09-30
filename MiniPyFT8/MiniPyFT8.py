@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
-import time, threading, socket, queue
+import time, threading, socket, queue, json
 from MiniPyFT8.receiver import Receiver
 from MiniPyFT8.transmitter import Transmitter
 from MiniPyFT8.rigctrl import Rig_hamlib
@@ -52,48 +52,42 @@ class App:
 
         self.scrollbar.config(command=self.text_widget.yview)
         self.container.pack() 
-        self.root.bind("<<received_decode>>", self.received_decode)
+        self.root.bind("<<received_udp>>", self.received_udp)
         threading.Thread(target = self.monitor_socket, daemon = True).start()
-
-    def add_call_hashes(self, call):
-        chars = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/"
-        call_padded = (call + "          ")[:11]
-        hashes = []
-        for m in [10,12,22]:
-            x = 0
-            for c in call_padded:
-                x = 38*x + chars.find(c)
-                x = x & ((int(1) << 64) - 1)
-            x = x & ((1 << 64) - 1)
-            x = x * 47055833459
-            x = x & ((1 << 64) - 1)
-            x = x >> (64 - m)
-            hashes.append(x)
-            self.call_hashes[(x, m)] = call
-        return hashes
+        self.current_decodes = []
 
     def row_click(self, e):
         curr = e.widget.index("current").split('.')[0]
-        rx_message = e.widget.get(f"{curr}.0", f"{curr}.end")
-        reply = determine_reply(rx_message, '-5')
-        self.tx.set_transmit_payload(reply)
+        row_txt = e.widget.get(f"{curr}.0", f"{curr}.end")
+        if "~" in row_txt:
+            rx_message = row_txt.split('~')[1][1:]
+            their_snr = row_txt[:3]
+            reply = determine_reply(rx_message, their_snr)
+            self.tx.set_transmit_payload(reply)
 
     def monitor_socket(self):
         while True:
             time.sleep(0.1)
-            decode_text, addres = self.sock.recvfrom(1024)
-            decode_text = decode_text.decode()
-            if decode_text:
-                if decode_text.startswith('fHz'):
-                    decode_text = ' '.join(decode_text.split(',')[5:])
-                self.decode_queue.put(f"{decode_text}\n")
-                self.root.after(0, lambda: self.root.event_generate("<<received_decode>>"))
+            rx_bytes, addres = self.sock.recvfrom(1024)
+            if rx_bytes:
+                self.decode_queue.put(json.loads(rx_bytes.decode('utf-8')))
+                self.root.after(0, lambda: self.root.event_generate("<<received_udp>>"))
 
-    def received_decode(self, e):
-        text = self.decode_queue.get()
-        idx = 1 * ("==" in text) + 2 * text.startswith("CQ") + 3* text.startswith(myCall) +4 * (text.split(' ')[1] == myCall)
-        mtype = ['norm','info', 'cq','to_me','from_me'][idx]
-        self.text_widget.insert(tk.END, text, mtype)
+    def received_udp(self, e):
+        msg_dict = self.decode_queue.get()
+        if msg_dict['mtype'] == 'decode':
+            self.current_decodes.append(msg_dict)
+            their_snr, fHz, dt, msg_tuple = msg_dict['their_snr'], msg_dict['fHz'], msg_dict['dt'], msg_dict['msg_tuple'], 
+            idx = 1 * msg_tuple[0].startswith("CQ") + 2* msg_tuple[0].startswith(myCall) + 3 * (msg_tuple[1] == myCall)
+            display_type = ['norm','cq','to_me','from_me'][idx]
+            display_text = f"{their_snr:4s} {dt:5s} {fHz:6s} ~ {' '.join(msg_tuple)}"
+        elif msg_dict['mtype'] == 'rollover':
+            display_type = 'info'
+            display_text = msg_dict['info']
+        else:
+            display_type = 'info'
+            display_text = msg_dict['info']        
+        self.text_widget.insert(tk.END, f"{display_text}\n", display_type)
         self.text_widget.see('end')
 
 app = App(tk.Tk())
