@@ -1,5 +1,5 @@
 import numpy as np
-import wave, sys, pyaudio, time, threading, socket, json, psutil
+import wave, sys, pyaudio, time, threading, socket, json, psutil, subprocess
 
 SAMP_RATE = 12000
 SYM_RATE  = 6.25
