@@ -1,6 +1,5 @@
 import numpy as np
-import wave, sys, pyaudio, time, threading
-from rigctrl import Rig_hamlib
+import wave, sys, pyaudio, time, threading, socket, json, psutil
 
 SAMP_RATE = 12000
 SYM_RATE  = 6.25
@@ -87,12 +86,26 @@ def write_wav_file(audio_data_bytes, wave_output_file):
 def ifindex(arr, val, default = None):
     return arr.index(val) if val in arr else default
 
-def get_ft8_symbols(text, get_call_hashes, add_call_hashes):
+def get_ft8_symbols(text):
     c1, c2, grid_rpt = text.split(' ')
-    symbols, bits77 = pack_message(c1, c2, grid_rpt, get_call_hashes, add_call_hashes)
+    symbols, bits77 = pack_message(c1, c2, grid_rpt)
     return symbols
 
-def pack_message(c1, c2, gr, get_call_hashes, add_call_hashes):
+def _calc_hash_12(call):
+    chars = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/"
+    call_padded = (call + "          ")[:11]
+    m = 12
+    x = 0
+    for c in call_padded:
+        x = 38*x + chars.find(c)
+        x = x & ((int(1) << 64) - 1)
+    x = x & ((1 << 64) - 1)
+    x = x * 47055833459
+    x = x & ((1 << 64) - 1)
+    x = x >> (64 - m)
+    return x
+
+def pack_message(c1, c2, gr):
     c29a, c29b = pack_ft8_c29(c1), pack_ft8_c29(c2)
     g15, ir = pack_ft8_g15(gr)
     if c29a and c29b:
@@ -103,8 +116,7 @@ def pack_message(c1, c2, gr, get_call_hashes, add_call_hashes):
         bits77 = (c28a<<28+1+1+1+15+3) | (p1a<<28+1+1+15+3) | (c28b<<1+1+15+3) | (p1b <<1+15+3) | (ir<<15+3) | (g15<< 3) | (i3)
         symbols  = encode_bits77(bits77)
     if c29b and not c29a:
-        add_call_hashes(c1)
-        c28a, p1a = 2063592 + get_call_hashes(([c1][2][0], 0))
+        c28a, p1a = 2063592 + _calc_hash_12(c1)
         c28b, p1b = c29b
         i3 = 2 if c2.endswith('/P') else 1
         n3 = 0    
@@ -112,7 +124,7 @@ def pack_message(c1, c2, gr, get_call_hashes, add_call_hashes):
         symbols  = encode_bits77(bits77)
     if c29a and not c29b:
         add_call_hashes(c2)
-        c28b, p1b = 2063592 + get_call_hashes(([c2][2][0], 0))
+        c28b, p1b = 2063592 + _calc_hash_12(c2)
         c28a, p1a = c29a
         i3 = 2 if c1.endswith('/P') else 1
         n3 = 0    
@@ -222,38 +234,58 @@ def append_crc(bits77_int):
 
 
 class Transmitter:
-    def __init__(self, get_call_hashes, add_call_hashes):
-        self.get_call_hashes, self.add_call_hashes = get_call_hashes, add_call_hashes
-        self.rig = Rig_hamlib()
+    def __init__(self):
         self.tx_freq = 777
         self.tx_payload = None
         self.soundcard_out = SoundcardOut()
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.bind(('', 2122))
+        self._init_hamlib()
         threading.Thread(target = self.transmit_daemon, daemon = True).start()
 
-    def set_transmit_payload(self, message):
-        print(f"{time.time() % 30} set tx payload {message}")
-        if len(message.split(' ')) == 3:
-            mtx = MAX_TX_START_CYCLETIME
-            ct = time.time() % 15
-            delay = -1
-            if ct < mtx:
-                delay =  0
-            if ct > T_CYC - mtx:
-                delay = T_CYC - ct
-            if delay >= 0:
-                time.sleep(delay)
-                symbols = get_ft8_symbols(message, self.get_call_hashes, self.add_call_hashes)
-                audio_bytes = symbols_to_audio_bytes(symbols, f_base = self.tx_freq)
-                self.tx_payload = audio_bytes
+    def _init_hamlib(self, com = 'COM4', s = 9600, rigctld = 'C:/WSJT/wsjtx/bin/rigctld-wsjtx',
+                     rig = 3070, host = 'localhost', port = 4532):
+        if not any(['rigctld' in i.name() for i in psutil.process_iter()]):
+            cmd = f"{rigctld} -m {rig} -r {com} -s {s}"
+            threading.Thread(target = subprocess.run, args = (cmd,)).start()
+            time.sleep(0.5)
+        self.hamlib_sock = socket.create_connection((host, port))
+        self._hamlib_cmd(f"M PKTUSB 0")
+
+    def _hamlib_cmd(self, command):
+        if self.hamlib_sock:
+            self.hamlib_sock.sendall((command + "\n").encode())
+            return self.hamlib_sock.recv(1024).decode()
+
+    def _calc_delay(self):
+        mtx = MAX_TX_START_CYCLETIME
+        ct = time.time() % 15
+        delay = -1
+        if ct < mtx:
+            delay =  0
+        if ct > T_CYC - mtx:
+            delay = T_CYC - ct
+        return delay
         
     def transmit_daemon(self):
         while True:
             time.sleep(0.1)
-            if self.tx_payload is not None:
-                print(f"{time.time() % 30} transmit")
-                self.rig.ptt_on()
-                self.transmitting = True
-                self.soundcard_out.transmit_audio_data_bytes(self.tx_payload)
-                self.rig.ptt_off()
-                self.transmitting = False
-                self.tx_payload = None
+            rx_bytes, _ = self.sock.recvfrom(1024)
+            if rx_bytes:
+                rx_dict = json.loads(rx_bytes.decode('utf-8'))
+                if rx_dict['mtype'] == 'transmit':
+                    message = rx_dict['message']
+                    if len(message.split(' ')) == 3:
+                        symbols = get_ft8_symbols(message)
+                        audio_bytes = symbols_to_audio_bytes(symbols, f_base = self.tx_freq)
+                        delay = self._calc_delay()
+                        if delay >= 0:
+                            time.sleep(delay)
+                            print(f"{time.time() % 30} transmit")
+                            self._hamlib_cmd(f"T 1")
+                            self.soundcard_out.transmit_audio_data_bytes(audio_bytes)
+                            self._hamlib_cmd(f"T 0")
+                            self.tx_payload = None
+
+if __name__ == "__main__":
+    tx = Transmitter()

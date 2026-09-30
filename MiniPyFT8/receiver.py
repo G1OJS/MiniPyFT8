@@ -5,8 +5,6 @@ params = {'MIN_LLR_SD': 0.0,'HPS': 4, 'BPT':2,'SYM_RATE': 6.25,'SAMP_RATE': 1200
           'T_SEARCH_0': 4.6, 'T_SEARCH_1': 10.6, 'PAYLOAD_SYMBOLS': 79-7, 'LDPC_CONTROL': (40, 15) }
 params.update({'H0_RANGE': [-7 * params['HPS'], int(3.48 * params['SYM_RATE'] * params['HPS'])]})
 
-call_hashes = {}
-
 sock = None
 def send_udp(msg_dict):
     global sock
@@ -15,7 +13,8 @@ def send_udp(msg_dict):
     sock.connect(('localhost', 2121))
     sock.send(json.dumps(msg_dict).encode('utf-8'))
 
-def add_call_hashes(call):
+call_hashes = {}
+def add_call_hash(call):
     global call_hashes
     chars = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/"
     call_padded = (call + "          ")[:11]
@@ -30,8 +29,7 @@ def add_call_hashes(call):
         x = x & ((1 << 64) - 1)
         x = x >> (64 - m)
         hashes.append(x)
-        call_hashes[(x, m)] = call
-    return hashes
+        call_hashes[(x,m)] = call
 
 #=========== Unpacking functions ========================================
 CALLSIGN_PREFIXES1 = "A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,R,S,T,U,V,W,X,Y,Z"
@@ -73,7 +71,7 @@ def unpack(bits):
             cb = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/"[c58 % 38] + cb
             c58 = c58 // 38
         cb =  cb.strip()
-        add_call_hashes(cb)
+        add_call_hash(cb)
         (ca, cb) = (cb, ca) if swp else (ca, cb)
         return (ca, cb, ('', 'RRR', 'RR73', '73')[rrr])
     elif i3 == 5:
@@ -121,7 +119,7 @@ def call_29(call_int29, i3):
                 call = call + ('/P' if i3 == 2 else '/R')
             if call.endswith("/R") and not call[0] in ['A','K','N','W']:
                 return None
-            add_call_hashes(call)
+            add_call_hash(call)
             return call
 
 def standard_call28(call_int28, i3):
@@ -259,12 +257,6 @@ class Receiver:
         self.duplicate_filter = []
         threading.Thread(target = self.decode_manager, daemon=True ).start()
         threading.Thread(target = self.cycle_manager, daemon=True ).start()
-
-    def get_call_hashes(self, xm):
-        return call_hashes[xm]
-
-    def add_call_hashes(self, call):
-        add_call_hashes(call)
 
     def decode_manager(self):
         while True:

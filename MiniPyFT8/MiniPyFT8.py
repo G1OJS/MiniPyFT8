@@ -31,8 +31,7 @@ class App:
         self.call_hashes = {}
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind(('', 2121))
-        self.rx = Receiver()
-        self.tx = Transmitter(self.rx.get_call_hashes, self.rx.add_call_hashes)
+        self.sock_tx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.decode_queue = queue.Queue()
         self.root = root
         self.container = ttk.Frame(self.root) 
@@ -49,21 +48,16 @@ class App:
         self.text_widget.bind('<Button-1>', self.row_click)
 
         self.scrollbar.config(command=self.text_widget.yview)
-        self.container.pack() 
-        self.root.bind("<<received_udp>>", self.received_udp)
-        threading.Thread(target = self.monitor_socket, daemon = True).start()
+        self.container.pack()
         self.current_decodes = []
+        self.root.bind("<<received_udp>>", self.received_udp)
+        threading.Thread(target = self.monitor_udp, daemon = True).start()
+        
+    def send_udp(self, msg):
+        self.sock_tx.connect(('localhost', 2122))
+        self.sock_tx.send(json.dumps(msg).encode('utf-8'))
 
-    def row_click(self, e):
-        curr = e.widget.index("current").split('.')[0]
-        row_txt = e.widget.get(f"{curr}.0", f"{curr}.end")
-        if "~" in row_txt:
-            rx_message = row_txt.split('~')[1][1:]
-            their_snr = row_txt[:3]
-            reply = determine_reply(rx_message, their_snr)
-            self.tx.set_transmit_payload(reply)
-
-    def monitor_socket(self):
+    def monitor_udp(self):
         while True:
             time.sleep(0.1)
             rx_bytes, addres = self.sock.recvfrom(1024)
@@ -88,5 +82,18 @@ class App:
         self.text_widget.insert(tk.END, f"{display_text}\n", display_type)
         self.text_widget.see('end')
 
+    def row_click(self, e):
+        curr = e.widget.index("current").split('.')[0]
+        row_txt = e.widget.get(f"{curr}.0", f"{curr}.end")
+        if "~" in row_txt:
+            rx_message = row_txt.split('~')[1][1:]
+            their_snr = row_txt[:3]
+            reply = determine_reply(rx_message, their_snr)
+            self.send_udp({'mtype':'transmit', 'message':reply})
+
+
+
+#rx = Receiver()
+#tx = Transmitter()
 app = App(tk.Tk())
 app.root.mainloop()
