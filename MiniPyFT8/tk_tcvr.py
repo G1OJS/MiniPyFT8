@@ -1,10 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
 import time, threading, socket, queue, json
-from receiver import Receiver
-from transmitter import Transmitter
-
-MAX_TX_START_CYCLETIME = 3
 
 myCall, myGrid = "G1OJS", "IO90"
 
@@ -92,8 +88,11 @@ class App:
             self.send_udp({'mtype':'transmit', 'message':reply})
 
 
-
-#rx = Receiver()
-#tx = Transmitter()
+if True:
+    from receiver import Receiver
+    from transmitter import Transmitter
+    rx = Receiver()
+    tx = Transmitter()
+    
 app = App(tk.Tk())
 app.root.mainloop()
