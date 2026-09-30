@@ -3,7 +3,6 @@ from tkinter import ttk
 import time, threading, socket, queue, json
 from MiniPyFT8.receiver import Receiver
 from MiniPyFT8.transmitter import Transmitter
-from MiniPyFT8.rigctrl import Rig_hamlib
 
 MAX_TX_START_CYCLETIME = 3
 
@@ -34,7 +33,7 @@ class App:
         self.sock.bind(('', 2121))
         self.rig = Rig_hamlib()
         self.rx = Receiver()
-        self.tx = Transmitter(self.rx.get_call_hashes, self.rx.add_call_hashes, self.rig)
+        self.tx = Transmitter(self.rx.get_call_hashes, self.rx.add_call_hashes)
         self.decode_queue = queue.Queue()
         self.root = root
         self.container = ttk.Frame(self.root) 

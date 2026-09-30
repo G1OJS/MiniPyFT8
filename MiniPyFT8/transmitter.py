@@ -1,5 +1,6 @@
 import numpy as np
 import wave, sys, pyaudio, time, threading
+from MiniPyFT8.rigctrl import Rig_hamlib
 
 SAMP_RATE = 12000
 SYM_RATE  = 6.25
@@ -221,9 +222,9 @@ def append_crc(bits77_int):
 
 
 class Transmitter:
-    def __init__(self, get_call_hashes, add_call_hashes, rig):
+    def __init__(self, get_call_hashes, add_call_hashes):
         self.get_call_hashes, self.add_call_hashes = get_call_hashes, add_call_hashes
-        self.rig = rig
+        self.rig = Rig_hamlib()
         self.tx_freq = 777
         self.tx_payload = None
         self.soundcard_out = SoundcardOut()
