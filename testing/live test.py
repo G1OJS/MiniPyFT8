@@ -103,7 +103,7 @@ def monitor_decodes():
                 baseline_decode_count = baseline_counts[py_cycle[1]] if py_cycle[1] < len(baseline_counts) else 0
                 py_cycle[0] = m['cyclestart_string']
                 py_cycle[1] += 1
-            py_times.append(time.time() - t_start)
+            py_times.append(float(m['t_decode']) - t_start)
             decode_count = len(py_times)
             diff = decode_count - baseline_decode_count
             py_info  = f"{decode_count:03d}({diff:+03d}) {py_cycle[1]:03d} {py_times[-1]:7.2f} {m}"
