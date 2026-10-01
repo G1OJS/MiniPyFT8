@@ -1,3 +1,135 @@
 001(-18) 001   12.94 {'mtype': 'decode', 'cyclestart_string': '260930_223615', 'fHz': ' 334.38', 'dt': '-0.10', 'their_snr': '-12', 'msg_tuple': ['CQ', 'JO1COV', 'PM95']}
 002(-17) 001   12.94 {'mtype': 'decode', 'cyclestart_string': '260930_223615', 'fHz': ' 390.62', 'dt': '-0.14', 'their_snr': '+14', 'msg_tuple': ['M0XMX', 'RV6AFG', '73']}
 003(-16) 001   12.95 {'mtype': 'decode', 'cyclestart_string': '260930_223615', 'fHz': ' 450.00', 'dt': '+0.10', 'their_snr': '+05', 'msg_tuple': ['CQ', 'ON2RK', 'JO20']}
+004(-15) 001   17.97 {'mtype': 'decode', 'cyclestart_string': '260930_223615', 'fHz': ' 759.38', 'dt': '+0.02', 'their_snr': '+24', 'msg_tuple': ['UR7HN', 'HB9BIN', 'RR73']}
+005(-14) 001   17.98 {'mtype': 'decode', 'cyclestart_string': '260930_223615', 'fHz': ' 984.38', 'dt': '-0.10', 'their_snr': '-18', 'msg_tuple': ['RA3TPE', 'TA1NGE', 'RR73']}
+006(-13) 001   17.98 {'mtype': 'decode', 'cyclestart_string': '260930_223615', 'fHz': '1056.25', 'dt': '-0.14', 'their_snr': '+02', 'msg_tuple': ['CQ', 'EA5OL', 'IM99']}
+007(-12) 001   17.99 {'mtype': 'decode', 'cyclestart_string': '260930_223615', 'fHz': '1259.38', 'dt': '-0.14', 'their_snr': '-09', 'msg_tuple': ['SV2BRA', 'I4WQH', 'JN54']}
+008(-11) 001   18.00 {'mtype': 'decode', 'cyclestart_string': '260930_223615', 'fHz': '1365.62', 'dt': '-0.10', 'their_snr': '-05', 'msg_tuple': ['SP9LKP', 'F4VTS', 'R-12']}
+009(-10) 001   18.01 {'mtype': 'decode', 'cyclestart_string': '260930_223615', 'fHz': '1681.25', 'dt': '-0.14', 'their_snr': '+05', 'msg_tuple': ['SQ6PZL', 'MM0IMC', '-06']}
+010(-09) 001   18.02 {'mtype': 'decode', 'cyclestart_string': '260930_223615', 'fHz': '2040.62', 'dt': '-0.10', 'their_snr': '+24', 'msg_tuple': ['CQ', '9A9A', 'JN75']}
+011(-08) 001   18.03 {'mtype': 'decode', 'cyclestart_string': '260930_223615', 'fHz': '2131.25', 'dt': '+0.22', 'their_snr': '-05', 'msg_tuple': ['<...>', 'LZ365BM', 'RR73']}
+012(-07) 001   18.04 {'mtype': 'decode', 'cyclestart_string': '260930_223615', 'fHz': '2718.75', 'dt': '-0.26', 'their_snr': '-06', 'msg_tuple': ['CQ', 'R4HM', 'LO43']}
+013(-06) 001   18.04 {'mtype': 'decode', 'cyclestart_string': '260930_223615', 'fHz': '2515.62', 'dt': '+0.30', 'their_snr': '+11', 'msg_tuple': ['CQ', 'F5CCX', 'JN18']}
+014(-05) 001   18.05 {'mtype': 'decode', 'cyclestart_string': '260930_223615', 'fHz': ' 259.38', 'dt': '+0.38', 'their_snr': '-12', 'msg_tuple': ['CT3IQ', 'EI8GVB', 'IO63']}
+015(-04) 001   18.06 {'mtype': 'decode', 'cyclestart_string': '260930_223615', 'fHz': '1500.00', 'dt': '+0.38', 'their_snr': '-13', 'msg_tuple': ['RX3ASQ', 'TA3AHJ', '-08']}
+016(-03) 001   18.08 {'mtype': 'decode', 'cyclestart_string': '260930_223615', 'fHz': '1921.88', 'dt': '+0.38', 'their_snr': '-20', 'msg_tuple': ['RW6PA', 'UA3NFG', '73']}
+017(-02) 001   18.10 {'mtype': 'decode', 'cyclestart_string': '260930_223615', 'fHz': '1603.12', 'dt': '+0.74', 'their_snr': '+03', 'msg_tuple': ['OZ5VO', 'IT9HVZ', 'JM78']}
+018(-01) 001   23.11 {'mtype': 'decode', 'cyclestart_string': '260930_223615', 'fHz': '1756.25', 'dt': '+1.70', 'their_snr': '+22', 'msg_tuple': ['CQ', 'ON3JJT', 'JO20']}
+019(-18) 002   28.13 {'mtype': 'decode', 'cyclestart_string': '260930_223630', 'fHz': ' 487.50', 'dt': '-0.18', 'their_snr': '-06', 'msg_tuple': ['2E0LDW', 'OK6LZ', 'R-09']}
+020(-17) 002   28.17 {'mtype': 'decode', 'cyclestart_string': '260930_223630', 'fHz': ' 553.12', 'dt': '-0.10', 'their_snr': '+00', 'msg_tuple': ['CQ', 'G3ZQQ', 'IO82']}
+021(-16) 002   28.19 {'mtype': 'decode', 'cyclestart_string': '260930_223630', 'fHz': ' 703.12', 'dt': '-0.10', 'their_snr': '+16', 'msg_tuple': ['CQ', 'IK4LZH', 'JN54']}
+022(-15) 002   28.21 {'mtype': 'decode', 'cyclestart_string': '260930_223630', 'fHz': ' 818.75', 'dt': '-0.06', 'their_snr': '-08', 'msg_tuple': ['R3FO', 'DL1KDA', 'RR73']}
+023(-14) 002   33.22 {'mtype': 'decode', 'cyclestart_string': '260930_223630', 'fHz': ' 887.50', 'dt': '-0.18', 'their_snr': '+06', 'msg_tuple': ['CQ', 'IQ5PJ', 'JN53']}
+024(-13) 002   33.26 {'mtype': 'decode', 'cyclestart_string': '260930_223630', 'fHz': '1118.75', 'dt': '-0.06', 'their_snr': '+01', 'msg_tuple': ['DG1BQC', 'HB9CUZ', '-17']}
+025(-12) 002   33.28 {'mtype': 'decode', 'cyclestart_string': '260930_223630', 'fHz': '1209.38', 'dt': '-0.22', 'their_snr': '+14', 'msg_tuple': ['HB9BIN', 'UR7HN', '73']}
+026(-11) 002   33.30 {'mtype': 'decode', 'cyclestart_string': '260930_223630', 'fHz': '1259.38', 'dt': '-0.06', 'their_snr': '-04', 'msg_tuple': ['I4WQH', 'SV2BRA', '-06']}
+027(-10) 002   33.32 {'mtype': 'decode', 'cyclestart_string': '260930_223630', 'fHz': '1400.00', 'dt': '-0.70', 'their_snr': '-04', 'msg_tuple': ['CQ', 'CT3IQ', 'IM12']}
+028(-09) 002   33.34 {'mtype': 'decode', 'cyclestart_string': '260930_223630', 'fHz': '1828.12', 'dt': '-0.14', 'their_snr': '-01', 'msg_tuple': ['CQ', 'F6HUK', 'JN06']}
+029(-08) 002   33.36 {'mtype': 'decode', 'cyclestart_string': '260930_223630', 'fHz': '1859.38', 'dt': '-0.18', 'their_snr': '+07', 'msg_tuple': ['CQ', 'IZ5ILK', 'JN63']}
+030(-07) 002   33.38 {'mtype': 'decode', 'cyclestart_string': '260930_223630', 'fHz': '2043.75', 'dt': '-0.06', 'their_snr': '+06', 'msg_tuple': ['9A9A', 'DJ4TM', 'JN47']}
+031(-06) 002   33.39 {'mtype': 'decode', 'cyclestart_string': '260930_223630', 'fHz': '2275.00', 'dt': '+0.18', 'their_snr': '+12', 'msg_tuple': ['CQ', 'ON6UF', 'JO10']}
+032(-05) 002   33.41 {'mtype': 'decode', 'cyclestart_string': '260930_223630', 'fHz': '2321.88', 'dt': '-0.06', 'their_snr': '-06', 'msg_tuple': ['DK3EL', 'R8AU', '-16']}
+033(-04) 002   33.43 {'mtype': 'decode', 'cyclestart_string': '260930_223630', 'fHz': '2628.12', 'dt': '-0.14', 'their_snr': '+10', 'msg_tuple': ['<...>', 'OR18OSB', 'RR73']}
+034(-03) 002   38.45 {'mtype': 'decode', 'cyclestart_string': '260930_223630', 'fHz': '2134.38', 'dt': '+2.18', 'their_snr': '+01', 'msg_tuple': ['<LZ365BM>', 'UA9FGR', 'LO87']}
+035(-22) 003   43.48 {'mtype': 'decode', 'cyclestart_string': '260930_223645', 'fHz': ' 259.38', 'dt': '+0.42', 'their_snr': '-09', 'msg_tuple': ['CT3IQ', 'EI8GVB', 'IO63']}
+036(-21) 003   43.50 {'mtype': 'decode', 'cyclestart_string': '260930_223645', 'fHz': ' 334.38', 'dt': '-0.06', 'their_snr': '+00', 'msg_tuple': ['DH1NAS', 'JO1COV', '-05']}
+037(-20) 003   43.52 {'mtype': 'decode', 'cyclestart_string': '260930_223645', 'fHz': ' 387.50', 'dt': '-0.06', 'their_snr': '+12', 'msg_tuple': ['CQ', 'RV6AFG', 'KN95']}
+038(-19) 003   43.53 {'mtype': 'decode', 'cyclestart_string': '260930_223645', 'fHz': ' 453.12', 'dt': '+0.10', 'their_snr': '+04', 'msg_tuple': ['CQ', 'ON2RK', 'JO20']}
+039(-18) 003   43.55 {'mtype': 'decode', 'cyclestart_string': '260930_223645', 'fHz': ' 487.50', 'dt': '-0.02', 'their_snr': '+19', 'msg_tuple': ['OK6LZ', '2E0LDW', '+06']}
+040(-17) 003   43.57 {'mtype': 'decode', 'cyclestart_string': '260930_223645', 'fHz': ' 771.88', 'dt': '+0.02', 'their_snr': '-01', 'msg_tuple': ['CQ', 'DM100ZM', '']}
+041(-16) 003   48.59 {'mtype': 'decode', 'cyclestart_string': '260930_223645', 'fHz': '1059.38', 'dt': '-0.14', 'their_snr': '-08', 'msg_tuple': ['CQ', 'EA5OL', 'IM99']}
+042(-15) 003   48.62 {'mtype': 'decode', 'cyclestart_string': '260930_223645', 'fHz': '1259.38', 'dt': '+0.06', 'their_snr': '+00', 'msg_tuple': ['SV2BRA', 'I4WQH', 'R-09']}
+043(-14) 003   48.64 {'mtype': 'decode', 'cyclestart_string': '260930_223645', 'fHz': '1365.62', 'dt': '-0.06', 'their_snr': '-07', 'msg_tuple': ['SP9LKP', 'F4VTS', '73']}
+044(-13) 003   48.65 {'mtype': 'decode', 'cyclestart_string': '260930_223645', 'fHz': '1503.12', 'dt': '+0.38', 'their_snr': '+09', 'msg_tuple': ['RX3ASQ', 'TA3AHJ', '-08']}
+045(-12) 003   48.66 {'mtype': 'decode', 'cyclestart_string': '260930_223645', 'fHz': '1681.25', 'dt': '-0.14', 'their_snr': '+05', 'msg_tuple': ['SQ6PZL', 'MM0IMC', 'RR73']}
+046(-11) 003   48.68 {'mtype': 'decode', 'cyclestart_string': '260930_223645', 'fHz': '2043.75', 'dt': '-0.10', 'their_snr': '+24', 'msg_tuple': ['CQ', '9A9A', 'JN75']}
+047(-10) 003   48.69 {'mtype': 'decode', 'cyclestart_string': '260930_223645', 'fHz': '2131.25', 'dt': '+0.02', 'their_snr': '-11', 'msg_tuple': ['CQ', 'LZ365BM', '']}
+048(-09) 003   48.70 {'mtype': 'decode', 'cyclestart_string': '260930_223645', 'fHz': '2384.38', 'dt': '-0.06', 'their_snr': '-08', 'msg_tuple': ['E75C', 'PA3GAE', 'JO21']}
+049(-08) 003   48.71 {'mtype': 'decode', 'cyclestart_string': '260930_223645', 'fHz': '2515.62', 'dt': '+0.34', 'their_snr': '+09', 'msg_tuple': ['CQ', 'F5CCX', 'JN18']}
+050(-07) 003   48.73 {'mtype': 'decode', 'cyclestart_string': '260930_223645', 'fHz': '2575.00', 'dt': '-0.10', 'their_snr': '-16', 'msg_tuple': ['<OR18OSB>', 'DL8RCH', 'JN68']}
+051(-06) 003   48.74 {'mtype': 'decode', 'cyclestart_string': '260930_223645', 'fHz': '2718.75', 'dt': '-0.30', 'their_snr': '+10', 'msg_tuple': ['ES3AT', 'R4HM', '-06']}
+052(-05) 003   48.75 {'mtype': 'decode', 'cyclestart_string': '260930_223645', 'fHz': '1603.12', 'dt': '+0.78', 'their_snr': '-04', 'msg_tuple': ['OZ5VO', 'IT9HVZ', 'R-04']}
+053(-04) 003   53.76 {'mtype': 'decode', 'cyclestart_string': '260930_223645', 'fHz': '1756.25', 'dt': '+1.70', 'their_snr': '+16', 'msg_tuple': ['CQ', 'ON3JJT', 'JO20']}
+054(-03) 003   53.78 {'mtype': 'decode', 'cyclestart_string': '260930_223645', 'fHz': '2200.00', 'dt': '+1.90', 'their_snr': '+10', 'msg_tuple': ['BD8NBG', 'UY7IV', 'RR73']}
+055(-18) 004   63.81 {'mtype': 'decode', 'cyclestart_string': '260930_223700', 'fHz': ' 331.25', 'dt': '+0.06', 'their_snr': '+03', 'msg_tuple': ['JO1COV', 'DH1NAS', 'R+02']}
+056(-17) 004   63.82 {'mtype': 'decode', 'cyclestart_string': '260930_223700', 'fHz': ' 487.50', 'dt': '-0.22', 'their_snr': '-02', 'msg_tuple': ['2E0LDW', 'OK6LZ', 'R-04']}
+057(-16) 004   63.83 {'mtype': 'decode', 'cyclestart_string': '260930_223700', 'fHz': ' 703.12', 'dt': '-0.14', 'their_snr': '+24', 'msg_tuple': ['CQ', 'IK4LZH', 'JN54']}
+058(-15) 004   63.84 {'mtype': 'decode', 'cyclestart_string': '260930_223700', 'fHz': ' 887.50', 'dt': '-0.26', 'their_snr': '+07', 'msg_tuple': ['CQ', 'IQ5PJ', 'JN53']}
+059(-14) 004   63.85 {'mtype': 'decode', 'cyclestart_string': '260930_223700', 'fHz': ' 950.00', 'dt': '-0.38', 'their_snr': '-09', 'msg_tuple': ['CQ', 'IU8DMZ', 'JN70']}
+060(-13) 004   63.86 {'mtype': 'decode', 'cyclestart_string': '260930_223700', 'fHz': '1118.75', 'dt': '-0.14', 'their_snr': '+13', 'msg_tuple': ['DG1BQC', 'HB9CUZ', 'RRR']}
+061(-12) 004   63.87 {'mtype': 'decode', 'cyclestart_string': '260930_223700', 'fHz': '1209.38', 'dt': '-0.30', 'their_snr': '+04', 'msg_tuple': ['CQ', 'UR7HN', 'KN79']}
+062(-11) 004   63.88 {'mtype': 'decode', 'cyclestart_string': '260930_223700', 'fHz': '1828.12', 'dt': '-0.22', 'their_snr': '-01', 'msg_tuple': ['CQ', 'F6HUK', 'JN06']}
+063(-10) 004   63.89 {'mtype': 'decode', 'cyclestart_string': '260930_223700', 'fHz': '1965.62', 'dt': '-0.06', 'their_snr': '-10', 'msg_tuple': ['MM0IMC', 'SQ6PZL', '73']}
+064(-09) 004   63.90 {'mtype': 'decode', 'cyclestart_string': '260930_223700', 'fHz': '2040.62', 'dt': '-0.10', 'their_snr': '-07', 'msg_tuple': ['9A9A', 'DJ4TM', 'JN47']}
+065(-08) 004   63.91 {'mtype': 'decode', 'cyclestart_string': '260930_223700', 'fHz': '2275.00', 'dt': '+0.10', 'their_snr': '+07', 'msg_tuple': ['CQ', 'ON6UF', 'JO10']}
+066(-07) 004   63.92 {'mtype': 'decode', 'cyclestart_string': '260930_223700', 'fHz': '2321.88', 'dt': '-0.10', 'their_snr': '+12', 'msg_tuple': ['DK3EL', 'R8AU', 'RR73']}
+067(-06) 004   63.93 {'mtype': 'decode', 'cyclestart_string': '260930_223700', 'fHz': '2384.38', 'dt': '+0.74', 'their_snr': '+12', 'msg_tuple': ['PA3GAE', 'E75C', '+02']}
+068(-05) 004   63.94 {'mtype': 'decode', 'cyclestart_string': '260930_223700', 'fHz': '2453.12', 'dt': '+0.10', 'their_snr': '+01', 'msg_tuple': ['BA7IO', 'EA3ZD', 'JN01']}
+069(-21) 005   73.95 {'mtype': 'decode', 'cyclestart_string': '260930_223715', 'fHz': ' 334.38', 'dt': '-0.14', 'their_snr': '-05', 'msg_tuple': ['DH1NAS', 'JO1COV', 'RR73']}
+070(-20) 005   73.98 {'mtype': 'decode', 'cyclestart_string': '260930_223715', 'fHz': ' 390.62', 'dt': '-0.18', 'their_snr': '+23', 'msg_tuple': ['CQ', 'RV6AFG', 'KN95']}
+071(-19) 005   74.00 {'mtype': 'decode', 'cyclestart_string': '260930_223715', 'fHz': ' 450.00', 'dt': '+0.02', 'their_snr': '+02', 'msg_tuple': ['SP4TXI', 'ON2RK', '+06']}
+072(-18) 005   74.01 {'mtype': 'decode', 'cyclestart_string': '260930_223715', 'fHz': ' 771.88', 'dt': '-0.22', 'their_snr': '-04', 'msg_tuple': ['YO9IAB', '<DM100ZM>', '+06']}
+073(-17) 005   74.02 {'mtype': 'decode', 'cyclestart_string': '260930_223715', 'fHz': '1059.38', 'dt': '-0.18', 'their_snr': '-01', 'msg_tuple': ['CQ', 'EA5OL', 'IM99']}
+074(-16) 005   79.03 {'mtype': 'decode', 'cyclestart_string': '260930_223715', 'fHz': '1681.25', 'dt': '-0.22', 'their_snr': '+16', 'msg_tuple': ['4U1A', 'MM0IMC', 'R-03']}
+075(-15) 005   79.04 {'mtype': 'decode', 'cyclestart_string': '260930_223715', 'fHz': '2043.75', 'dt': '-0.18', 'their_snr': '+13', 'msg_tuple': ['RA9UJP', '9A9A', '-12']}
+076(-14) 005   79.05 {'mtype': 'decode', 'cyclestart_string': '260930_223715', 'fHz': '2128.12', 'dt': '+0.14', 'their_snr': '+08', 'msg_tuple': ['CQ', 'LZ365BM', '']}
+077(-13) 005   79.06 {'mtype': 'decode', 'cyclestart_string': '260930_223715', 'fHz': '2387.50', 'dt': '-0.14', 'their_snr': '+03', 'msg_tuple': ['E75C', 'PA3GAE', 'R+01']}
+078(-12) 005   79.08 {'mtype': 'decode', 'cyclestart_string': '260930_223715', 'fHz': '2515.62', 'dt': '+0.26', 'their_snr': '+05', 'msg_tuple': ['R2GCT', 'F5CCX', '-05']}
+079(-11) 005   79.09 {'mtype': 'decode', 'cyclestart_string': '260930_223715', 'fHz': '2575.00', 'dt': '-0.18', 'their_snr': '+02', 'msg_tuple': ['<OR18OSB>', 'DL8RCH', 'JN68']}
+080(-10) 005   79.10 {'mtype': 'decode', 'cyclestart_string': '260930_223715', 'fHz': '2718.75', 'dt': '-0.34', 'their_snr': '+03', 'msg_tuple': ['ES3AT', 'R4HM', '-06']}
+081(-09) 005   79.11 {'mtype': 'decode', 'cyclestart_string': '260930_223715', 'fHz': ' 259.38', 'dt': '+0.34', 'their_snr': '-07', 'msg_tuple': ['CT3IQ', 'EI8GVB', 'IO63']}
+082(-08) 005   79.12 {'mtype': 'decode', 'cyclestart_string': '260930_223715', 'fHz': '1500.00', 'dt': '+0.34', 'their_snr': '+01', 'msg_tuple': ['IQ5PJ', 'TA3AHJ', '-07']}
+083(-07) 005   79.14 {'mtype': 'decode', 'cyclestart_string': '260930_223715', 'fHz': '1603.12', 'dt': '+0.74', 'their_snr': '+01', 'msg_tuple': ['OZ5VO', 'IT9HVZ', '73']}
+084(-06) 005   84.15 {'mtype': 'decode', 'cyclestart_string': '260930_223715', 'fHz': '1756.25', 'dt': '+1.62', 'their_snr': '+18', 'msg_tuple': ['CQ', 'ON3JJT', 'JO20']}
+085(-05) 005   84.16 {'mtype': 'decode', 'cyclestart_string': '260930_223715', 'fHz': '2200.00', 'dt': '+1.78', 'their_snr': '-03', 'msg_tuple': ['BD8NBG', 'UY7IV', 'RR73']}
+086(-24) 006   89.17 {'mtype': 'decode', 'cyclestart_string': '260930_223730', 'fHz': ' 393.75', 'dt': '+0.02', 'their_snr': '+10', 'msg_tuple': ['<...>', 'S51SG', 'JN76']}
+087(-23) 006   89.19 {'mtype': 'decode', 'cyclestart_string': '260930_223730', 'fHz': ' 484.38', 'dt': '-0.14', 'their_snr': '+10', 'msg_tuple': ['2E0LDW', 'OK6LZ', 'R-08']}
+088(-22) 006   89.21 {'mtype': 'decode', 'cyclestart_string': '260930_223730', 'fHz': ' 550.00', 'dt': '-0.10', 'their_snr': '-10', 'msg_tuple': ['CQ', 'G3ZQQ', 'IO82']}
+089(-21) 006   89.22 {'mtype': 'decode', 'cyclestart_string': '260930_223730', 'fHz': ' 703.12', 'dt': '-0.14', 'their_snr': '+13', 'msg_tuple': ['CQ', 'IK4LZH', 'JN54']}
+090(-20) 006   89.23 {'mtype': 'decode', 'cyclestart_string': '260930_223730', 'fHz': ' 818.75', 'dt': '-0.06', 'their_snr': '+07', 'msg_tuple': ['CQ', 'DL1KDA', 'JO30']}
+091(-19) 006   89.24 {'mtype': 'decode', 'cyclestart_string': '260930_223730', 'fHz': ' 887.50', 'dt': '-0.18', 'their_snr': '+06', 'msg_tuple': ['RG0S', 'IQ5PJ', '-12']}
+092(-18) 006   89.25 {'mtype': 'decode', 'cyclestart_string': '260930_223730', 'fHz': ' 950.00', 'dt': '-0.34', 'their_snr': '+04', 'msg_tuple': ['CQ', 'IU8DMZ', 'JN70']}
+093(-17) 006   89.26 {'mtype': 'decode', 'cyclestart_string': '260930_223730', 'fHz': '1190.62', 'dt': '-0.26', 'their_snr': '+10', 'msg_tuple': ['CQ', 'UR7HN', 'KN79']}
+094(-16) 006   89.27 {'mtype': 'decode', 'cyclestart_string': '260930_223730', 'fHz': '1400.00', 'dt': '-0.70', 'their_snr': '-06', 'msg_tuple': ['PH0WAW', 'CT3IQ', '+05']}
+095(-15) 006   89.28 {'mtype': 'decode', 'cyclestart_string': '260930_223730', 'fHz': '1675.00', 'dt': '-0.18', 'their_snr': '+08', 'msg_tuple': ['DM2DLG', 'F6HUK', '-13']}
+096(-14) 006   94.29 {'mtype': 'decode', 'cyclestart_string': '260930_223730', 'fHz': '1856.25', 'dt': '-0.14', 'their_snr': '+00', 'msg_tuple': ['R1CBP', 'IZ5ILK', 'RR73']}
+097(-13) 006   94.32 {'mtype': 'decode', 'cyclestart_string': '260930_223730', 'fHz': '1965.62', 'dt': '-0.02', 'their_snr': '-08', 'msg_tuple': ['CQ', 'SQ6PZL', 'JO80']}
+098(-12) 006   94.34 {'mtype': 'decode', 'cyclestart_string': '260930_223730', 'fHz': '2275.00', 'dt': '+0.14', 'their_snr': '+19', 'msg_tuple': ['CQ', 'ON6UF', 'JO10']}
+099(-11) 006   94.36 {'mtype': 'decode', 'cyclestart_string': '260930_223730', 'fHz': '2321.88', 'dt': '-0.14', 'their_snr': '+07', 'msg_tuple': ['CQ', 'R8AU', 'MO05']}
+100(-10) 006   94.37 {'mtype': 'decode', 'cyclestart_string': '260930_223730', 'fHz': '2453.12', 'dt': '+0.14', 'their_snr': '+13', 'msg_tuple': ['BA7IO', 'EA3ZD', 'JN01']}
+101(-09) 006   94.39 {'mtype': 'decode', 'cyclestart_string': '260930_223730', 'fHz': '2384.38', 'dt': '+0.74', 'their_snr': '+11', 'msg_tuple': ['PA3GAE', 'E75C', '+02']}
+102(-26) 007  104.41 {'mtype': 'decode', 'cyclestart_string': '260930_223745', 'fHz': ' 334.38', 'dt': '-0.10', 'their_snr': '-07', 'msg_tuple': ['CQ', 'JO1COV', 'PM95']}
+103(-25) 007  104.43 {'mtype': 'decode', 'cyclestart_string': '260930_223745', 'fHz': ' 390.62', 'dt': '-0.14', 'their_snr': '+09', 'msg_tuple': ['CQ', 'RV6AFG', 'KN95']}
+104(-24) 007  104.45 {'mtype': 'decode', 'cyclestart_string': '260930_223745', 'fHz': ' 450.00', 'dt': '+0.10', 'their_snr': '+19', 'msg_tuple': ['SP4TXI', 'ON2RK', 'RR73']}
+105(-23) 007  104.46 {'mtype': 'decode', 'cyclestart_string': '260930_223745', 'fHz': ' 771.88', 'dt': '-0.18', 'their_snr': '-03', 'msg_tuple': ['<YO9IAB>', 'DM100ZM', 'RR73']}
+106(-22) 007  104.47 {'mtype': 'decode', 'cyclestart_string': '260930_223745', 'fHz': '1056.25', 'dt': '-0.14', 'their_snr': '-06', 'msg_tuple': ['CQ', 'EA5OL', 'IM99']}
+107(-21) 007  104.48 {'mtype': 'decode', 'cyclestart_string': '260930_223745', 'fHz': '1556.25', 'dt': '-0.18', 'their_snr': '-11', 'msg_tuple': ['CQ', '7Z1AL', 'LL56']}
+108(-20) 007  104.49 {'mtype': 'decode', 'cyclestart_string': '260930_223745', 'fHz': '1681.25', 'dt': '-0.18', 'their_snr': '-04', 'msg_tuple': ['4U1A', 'MM0IMC', '73']}
+109(-19) 007  109.50 {'mtype': 'decode', 'cyclestart_string': '260930_223745', 'fHz': '1825.00', 'dt': '-0.18', 'their_snr': '-02', 'msg_tuple': ['CQ', 'R4WZ', 'LO67']}
+110(-18) 007  109.52 {'mtype': 'decode', 'cyclestart_string': '260930_223745', 'fHz': '2043.75', 'dt': '-0.14', 'their_snr': '+21', 'msg_tuple': ['RA9UJP', '9A9A', 'RR73']}
+111(-17) 007  109.53 {'mtype': 'decode', 'cyclestart_string': '260930_223745', 'fHz': '2384.38', 'dt': '-0.10', 'their_snr': '-02', 'msg_tuple': ['E75C', 'PA3GAE', 'R+02']}
+112(-16) 007  109.54 {'mtype': 'decode', 'cyclestart_string': '260930_223745', 'fHz': '2718.75', 'dt': '-0.30', 'their_snr': '+01', 'msg_tuple': ['ES3AT', 'R4HM', 'RR73']}
+113(-15) 007  109.56 {'mtype': 'decode', 'cyclestart_string': '260930_223745', 'fHz': '2131.25', 'dt': '+0.30', 'their_snr': '-01', 'msg_tuple': ['CQ', 'LZ365BM', '']}
+114(-14) 007  109.57 {'mtype': 'decode', 'cyclestart_string': '260930_223745', 'fHz': '2515.62', 'dt': '+0.30', 'their_snr': '+10', 'msg_tuple': ['R2GCT', 'F5CCX', 'RR73']}
+115(-13) 007  109.58 {'mtype': 'decode', 'cyclestart_string': '260930_223745', 'fHz': ' 262.50', 'dt': '+0.42', 'their_snr': '-05', 'msg_tuple': ['CT3IQ', 'EI8GVB', 'IO63']}
+116(-12) 007  109.60 {'mtype': 'decode', 'cyclestart_string': '260930_223745', 'fHz': '1265.62', 'dt': '+0.62', 'their_snr': '+15', 'msg_tuple': ['CQ', 'OR7EG', 'JO11']}
+117(-11) 007  114.61 {'mtype': 'decode', 'cyclestart_string': '260930_223745', 'fHz': '1756.25', 'dt': '+1.70', 'their_snr': '+19', 'msg_tuple': ['CQ', 'ON3JJT', 'JO20']}
+118(-30) 008  119.63 {'mtype': 'decode', 'cyclestart_string': '260930_223800', 'fHz': ' 331.25', 'dt': '-0.30', 'their_snr': '-07', 'msg_tuple': ['JO1COV', 'IZ7NLM', '-11']}
+119(-29) 008  119.65 {'mtype': 'decode', 'cyclestart_string': '260930_223800', 'fHz': ' 484.38', 'dt': '-0.14', 'their_snr': '+08', 'msg_tuple': ['2E0LDW', 'OK6LZ', '73']}
+120(-28) 008  119.67 {'mtype': 'decode', 'cyclestart_string': '260930_223800', 'fHz': ' 537.50', 'dt': '+0.10', 'their_snr': '+05', 'msg_tuple': ['<...>', 'S51SG', 'JN76']}
+121(-27) 008  119.68 {'mtype': 'decode', 'cyclestart_string': '260930_223800', 'fHz': ' 703.12', 'dt': '+0.02', 'their_snr': '+09', 'msg_tuple': ['CQ', 'IK4LZH', 'JN54']}
+122(-26) 008  119.69 {'mtype': 'decode', 'cyclestart_string': '260930_223800', 'fHz': ' 818.75', 'dt': '-0.02', 'their_snr': '+02', 'msg_tuple': ['CQ', 'DL1KDA', 'JO30']}
+123(-25) 008  119.70 {'mtype': 'decode', 'cyclestart_string': '260930_223800', 'fHz': ' 887.50', 'dt': '-0.14', 'their_snr': '+02', 'msg_tuple': ['RG0S', 'IQ5PJ', 'RRR']}
+124(-24) 008  119.72 {'mtype': 'decode', 'cyclestart_string': '260930_223800', 'fHz': ' 950.00', 'dt': '-0.26', 'their_snr': '+07', 'msg_tuple': ['CQ', 'IU8DMZ', 'JN70']}
+125(-23) 008  119.73 {'mtype': 'decode', 'cyclestart_string': '260930_223800', 'fHz': '1081.25', 'dt': '+0.02', 'their_snr': '+01', 'msg_tuple': ['ES1KK', 'R7NO', '-07']}
+126(-22) 008  119.74 {'mtype': 'decode', 'cyclestart_string': '260930_223800', 'fHz': '1187.50', 'dt': '-0.22', 'their_snr': '+08', 'msg_tuple': ['CQ', 'UR7HN', 'KN79']}
+127(-21) 008  119.75 {'mtype': 'decode', 'cyclestart_string': '260930_223800', 'fHz': '1396.88', 'dt': '-0.62', 'their_snr': '-01', 'msg_tuple': ['PH0WAW', 'CT3IQ', 'RR73']}
+128(-20) 008  119.76 {'mtype': 'decode', 'cyclestart_string': '260930_223800', 'fHz': '1540.62', 'dt': '-0.30', 'their_snr': '+08', 'msg_tuple': ['DM100ZM', '<YO9IAB>', '73']}
+129(-19) 008  119.77 {'mtype': 'decode', 'cyclestart_string': '260930_223800', 'fHz': '1675.00', 'dt': '-0.10', 'their_snr': '-02', 'msg_tuple': ['DM2DLG', 'F6HUK', '-13']}
+130(-18) 008  119.78 {'mtype': 'decode', 'cyclestart_string': '260930_223800', 'fHz': '2131.25', 'dt': '-0.02', 'their_snr': '+01', 'msg_tuple': ['<LZ365BM>', 'DJ4TM', 'JN47']}
+131(-17) 008  119.79 {'mtype': 'decode', 'cyclestart_string': '260930_223800', 'fHz': '2275.00', 'dt': '+0.18', 'their_snr': '+10', 'msg_tuple': ['CQ', 'ON6UF', 'JO10']}
+132(-16) 008  119.80 {'mtype': 'decode', 'cyclestart_string': '260930_223800', 'fHz': '2321.88', 'dt': '+0.02', 'their_snr': '+00', 'msg_tuple': ['CQ', 'R8AU', 'MO05']}
+133(-15) 008  124.81 {'mtype': 'decode', 'cyclestart_string': '260930_223800', 'fHz': '2453.12', 'dt': '+0.22', 'their_snr': '+10', 'msg_tuple': ['BA7IO', 'EA3ZD', 'JN01']}
+134(-14) 008  124.83 {'mtype': 'decode', 'cyclestart_string': '260930_223800', 'fHz': '2628.12', 'dt': '-0.10', 'their_snr': '+05', 'msg_tuple': ['CQ', 'OR18OSB', '']}
+135(-13) 008  124.84 {'mtype': 'decode', 'cyclestart_string': '260930_223800', 'fHz': '2384.38', 'dt': '+0.78', 'their_snr': '+09', 'msg_tuple': ['PA3GAE', 'E75C', 'RR73']}

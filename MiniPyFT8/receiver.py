@@ -1,9 +1,11 @@
 import numpy as np
 import time, pyaudio, threading, queue, socket, json
 
-params = {'HPS': 4, 'BPT':2,'SYM_RATE': 6.25,'SAMP_RATE': 12000,
-          'T_SEARCH_0': 4.6, 'T_SEARCH_1': 10.6, 'PAYLOAD_SYMBOLS': 79-7, 'LDPC_CONTROL': (35, 12) }
-params.update({'H0_RANGE': [0, int(3.6 * params['SYM_RATE'] * params['HPS'])]})
+HPS, BPT = 4, 2
+SYM_RATE, SAMP_RATE = 6.25, 12000
+T_SEARCH_0, T_SEARCH_1 =  4.6, 10.6
+LDPC_CONTROL = (35, 12)
+H0_RANGE = [0, int(3.6 * SYM_RATE * HPS)]
 
 call_hashes = {}
 def add_call_hash(call):
@@ -183,11 +185,11 @@ def decode(p):
     llr = llr.ravel()
     ncheck = calc_ncheck(llr)
     ldpc_it = 0
-    if 0 < ncheck <= params['LDPC_CONTROL'][0]:
+    if 0 < ncheck <= LDPC_CONTROL[0]:
         llr = 3.5 * llr / (np.std(llr) + 0.01)
         llr = np.clip(llr, -3.7, 3.7)
         mC2V_prev6, mC2V_prev7 = None, None
-        for ldpc_it in range(params['LDPC_CONTROL'][1]):
+        for ldpc_it in range(LDPC_CONTROL[1]):
             update_collector = np.zeros_like(llr)
             mC2V_prev6 = pass_messages(llr, CV6idx, mC2V_prev6, update_collector)
             mC2V_prev7 = pass_messages(llr, CV7idx, mC2V_prev7, update_collector)
@@ -202,18 +204,18 @@ def decode(p):
 #============== AUDIO ========================================================
 class AudioIn:
     def __init__(self, input_device_keywords, max_freq):
-        self.fft_len = int(params['BPT'] * params['SAMP_RATE'] // params['SYM_RATE'])
+        self.fft_len = int(BPT * SAMP_RATE // SYM_RATE)
         fft_out_len = self.fft_len // 2 + 1
-        self.nFreqs = int(fft_out_len * 2 * max_freq / params['SAMP_RATE'])
+        self.nFreqs = int(fft_out_len * 2 * max_freq / SAMP_RATE)
         self.audio_buffer = np.zeros(self.fft_len, dtype=np.float32)
         self.fft_in = np.zeros(self.fft_len, dtype=np.float32)
         self.fft_window = fft_window=np.hanning(self.fft_len).astype(np.float32)
-        self.hops_per_cycle = int(15 * params['SYM_RATE'] * params['HPS'])
+        self.hops_per_cycle = int(15 * SYM_RATE * HPS)
         self.grid_main = np.ones((self.hops_per_cycle, self.nFreqs), dtype = np.float32)
         indev = self.find_device(input_device_keywords)
         self.stream = pyaudio.PyAudio().open(
-            format = pyaudio.paInt16, channels=1, rate = params['SAMP_RATE'], input = True, input_device_index = indev,
-            frames_per_buffer = int(params['SAMP_RATE'] / (params['SYM_RATE'] * params['HPS'])), stream_callback=self._callback,)
+            format = pyaudio.paInt16, channels=1, rate = SAMP_RATE, input = True, input_device_index = indev,
+            frames_per_buffer = int(SAMP_RATE / (SYM_RATE * HPS)), stream_callback=self._callback,)
         self.set_pointer()
         self.stream.start_stream()
 
@@ -231,7 +233,7 @@ class AudioIn:
         print(f"[Audio] No audio device found matching {device_str_contains}")
 
     def set_pointer(self):
-        self.grid_main_ptr = int((time.time() % 15) * params['SYM_RATE']*params['HPS'])
+        self.grid_main_ptr = int((time.time() % 15) * SYM_RATE * HPS)
 
     def _callback(self, in_data, frame_count, time_info, status_flags):
         samples = np.frombuffer(in_data, dtype=np.int16).astype(np.float32)
@@ -250,9 +252,39 @@ class Receiver:
         self.output = output
         self.decode_queue = queue.Queue()
         self.duplicate_filter = []
+        self.search_started = False
+        self.run_decodes = False
         self.sock_out = None
-        threading.Thread(target = self.decode_manager, daemon=True ).start()
-        threading.Thread(target = self.cycle_manager, daemon=True ).start()
+        payload_symb_idxs = list(range(7, 36)) + list(range(43, 72))
+        self.base_payload_hops = np.array([HPS * s for s in payload_symb_idxs])
+        self.hop_idxs_Costas =  np.arange(7) * HPS
+        self.base_freq_idxs = np.array([BPT // 2 + BPT * t for t in range(8)])
+        csync = np.full((7, 8*BPT), -1/7, np.float32)
+        for sym_idx, tone in enumerate([3,1,4,0,6,5,2]):
+            fbins = range(tone * BPT, (tone+1) * BPT)
+            csync[sym_idx, fbins] = 1.0
+            csync[sym_idx, 7 * BPT:] = 0.0
+        self.csync_flat =  csync.ravel()
+        self.send_output({'mtype':'info', 'info':'Receiver starting'})
+        while time.time() % 15 > 0.5:
+            time.sleep(0.1)
+        threading.Thread(target = self.manage_cycle, daemon=True ).start()
+        threading.Thread(target = self.manage_decodes, daemon=True ).start()
+
+    def manage_cycle(self):
+        t_cyc, t_cyc_prev = 0, 0
+        while True:
+            time.sleep(0.1)
+            t_cyc = time.time() % 15
+            if t_cyc < t_cyc_prev:
+                self.audio_in.set_pointer()
+                self.search_started = False
+            if t_cyc > T_SEARCH_1 and not self.search_started:
+                self.search_started = True
+                self.run_decodes = False
+                self.search()
+                self.run_decodes = True
+            t_cyc_prev = t_cyc
 
     def send_output(self, msg_dict):
         if self.output == 'print':
@@ -263,76 +295,52 @@ class Receiver:
         self.sock_out.connect(('localhost', 2121))
         self.sock_out.send(json.dumps(msg_dict).encode('utf-8'))
 
-    def decode_manager(self):
+    def search(self):
+        t0_cyc = 15 * int(time.time() / 15)
+        cycle_start_str = time.strftime("%y%m%d_%H%M%S", time.gmtime(t0_cyc + 1))
+        info = f"{cycle_start_str} ========================================"
+        self.send_output({'mtype':'rollover', 'info':info})
+        self.duplicate_filter = []
+        origins = []
+        for f0_idx in range(int(100 / 3.125), self.audio_in.nFreqs - 8 * BPT, 1):
+            time.sleep(0)
+            freq_idxs = f0_idx + self.base_freq_idxs
+            p = self.audio_in.grid_main[:, f0_idx:f0_idx+8*BPT]
+            p = 20*np.log10(p)
+            new_origin = {'score':0}
+            for h0_idx in range(H0_RANGE[0], H0_RANGE[1]):
+                hn_idx = h0_idx + self.base_payload_hops[-1]
+                sync_score = float(np.dot(p[h0_idx + self.hop_idxs_Costas + 36 * HPS, :].ravel(), self.csync_flat))
+                test_origin = {'f0_idx': f0_idx, 'h0_idx':h0_idx, 'cs':cycle_start_str, 'score':sync_score, 'hn_idx': hn_idx,
+                               'fHz': 3.125 * f0_idx, 'dt': h0_idx / (SYM_RATE * HPS) - 0.7, 'exhausted': False}
+                if test_origin['score'] > new_origin['score']:
+                    new_origin = test_origin
+            if new_origin['score'] > 100:
+                hops, freq_idxs = new_origin['h0_idx'] + self.base_payload_hops, new_origin['f0_idx'] + self.base_freq_idxs
+                p_idx = np.ix_(hops, freq_idxs)
+                new_origin.update({'p_idx':p_idx})
+                origins.append(new_origin)
+        origins.sort(key = lambda o: int(o['h0_idx']))
+        for origin in origins:
+            self.decode_queue.put(origin)
+
+    def manage_decodes(self):
         while True:
             time.sleep(0.01)
-            if not self.decode_queue.empty():
-                sync, p = self.decode_queue.get()
+            if self.run_decodes and not self.decode_queue.empty():
+                origin = self.decode_queue.get()
+                while self.audio_in.grid_main_ptr < origin['hn_idx']:
+                    time.sleep(0.05)
+                p = self.audio_in.grid_main[origin['p_idx']]
+                p = 20*np.log10(p)
                 msg_tuple = decode(p)
                 if msg_tuple and not msg_tuple in self.duplicate_filter:
                     their_snr = np.clip(int((np.max(p) - np.min(p))/2) - 58, -24, 24)
                     self.duplicate_filter.append(msg_tuple)
-                    self.send_output({'mtype':'decode', 'cyclestart_string': sync['cs'],
-                                      'fHz':f"{sync['fHz']:7.2f}", 'dt':f"{sync['dt']:+04.2f}",
+                    self.send_output({'mtype':'decode', 'cyclestart_string': origin['cs'],
+                                      'fHz':f"{origin['fHz']:7.2f}", 'dt':f"{origin['dt']:+04.2f}",
                                       'their_snr':f"{their_snr:+03d}", 'msg_tuple':msg_tuple})
-        
-    def cycle_manager(self):
-        nFreqs = self.audio_in.nFreqs
-        dt = 1.0 / (params['SYM_RATE'] * params['HPS']) 
-        payload_symb_idxs = list(range(7, 36)) + list(range(43, 72))
-        base_payload_hops = np.array([params['HPS'] * s for s in payload_symb_idxs])
-        hop_idxs_Costas =  np.arange(7) * params['HPS']
-        base_freq_idxs = np.array([params['BPT'] // 2 + params['BPT'] * t for t in range(8)])
-        syncs = {}
-        csync = np.full((7, 8*params['BPT']), -1/7, np.float32)
-        for sym_idx, tone in enumerate([3,1,4,0,6,5,2]):
-            fbins = range(tone* params['BPT'], (tone+1) * params['BPT'])
-            csync[sym_idx, fbins] = 1.0
-            csync[sym_idx, 7 * params['BPT']:] = 0.0
-        csync_flat =  csync.ravel()
-        self.send_output({'mtype':'info', 'info':'Receiver starting'})
-        
-        while time.time() % 15 > 0.5:
-            time.sleep(0.1)
 
-        while True:
-            t0_cyc = 15 * int(time.time() / 15)
-            self.audio_in.set_pointer()
-            time.sleep(params['T_SEARCH_1'])
-            cycle_start_str = time.strftime("%y%m%d_%H%M%S", time.gmtime(t0_cyc))
-            info = f"{cycle_start_str} ========================================"
-            self.send_output({'mtype':'rollover', 'info':info})
-            for f0_idx in range(int(100 / 3.125), nFreqs - 8 * params['BPT'], 1):
-                time.sleep(0)
-                freq_idxs = f0_idx + base_freq_idxs
-                p = self.audio_in.grid_main[:, f0_idx:f0_idx+8*params['BPT']]
-                p = 20*np.log10(p)
-                syncs[f0_idx] = {'score':0, 'h0_idx':0, 'dt': 0}
-                for h0_idx in range(params['H0_RANGE'][0], params['H0_RANGE'][1]):
-                    hn_idx = h0_idx + base_payload_hops[-1]
-                    sync_score = float(np.dot(p[h0_idx + hop_idxs_Costas + 36 * params['HPS'], :].ravel(), csync_flat))
-                    test_sync = {'cs':cycle_start_str, 'score':sync_score, 'h0_idx':h0_idx, 'hn_idx': hn_idx, 'fHz': 3.125 * f0_idx, 'dt': h0_idx * dt - 0.7}
-                    if test_sync['score'] > syncs[f0_idx]['score']:
-                        syncs[f0_idx] = test_sync
-
-            while not self.decode_queue.empty():
-                self.decode_queue.get()
-            t = time.time() % 15
-            self.duplicate_filter = []
-            print(f"{t:7.2f} start decode")
-            while time.time() % 15 > t:
-                time.sleep(0.1)
-                hop_ptr = self.audio_in.grid_main_ptr
-                f0_idxs = [f for f in list(syncs.keys()) if syncs[f]['score'] > 100
-                           and (hop_ptr > syncs[f]['hn_idx'] or hop_ptr < syncs[f]['h0_idx'])]
-                for f0_idx in f0_idxs:
-                    hops, freq_idxs = syncs[f0_idx]['h0_idx'] + base_payload_hops, f0_idx + base_freq_idxs
-                    p = self.audio_in.grid_main[np.ix_(hops, freq_idxs)]
-                    p = 20*np.log10(p)
-                    self.decode_queue.put((syncs[f0_idx].copy(), p))
-                    syncs[f0_idx]['score'] = -1
-
-        
 if __name__ == "__main__":
     rx = Receiver(mic_keywords = ['Mic', 'CODEC'], max_freq = 2900, output = 'print')
  
