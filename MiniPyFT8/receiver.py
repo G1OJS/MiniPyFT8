@@ -4,7 +4,7 @@ import time, pyaudio, threading, queue, socket, json
 HPS, BPT = 4, 2
 SYM_RATE, SAMP_RATE = 6.25, 12000
 T_SEARCH_0, T_SEARCH_1 =  4.6, 10.6
-LDPC_CONTROL = (30, 5)
+LDPC_CONTROL = (36, 15)
 H0_RANGE = [0, int(3.6 * SYM_RATE * HPS)]
 
 call_hashes = {}
@@ -246,7 +246,7 @@ class AudioIn:
         self.audio_buffer[-ns:] = samples
         np.multiply(self.audio_buffer, self.fft_window, out=self.fft_in)
         z = np.fft.rfft(self.fft_in)[:self.nFreqs]
-        self.grid_main[self.grid_main_ptr, :] = z.real*z.real + z.imag*z.imag
+        self.grid_main[self.grid_main_ptr, :] = 10*np.log10(z.real*z.real + z.imag*z.imag)
         self.grid_main_ptr = (self.grid_main_ptr + 1) % self.hops_per_cycle
         return (None, pyaudio.paContinue)
 
@@ -310,16 +310,15 @@ class Receiver:
             time.sleep(0)
             freq_idxs = f0_idx + self.base_freq_idxs
             p = self.audio_in.grid_main[:, f0_idx:f0_idx+8*BPT]
-            p_dB = 10*np.log10(p)
             new_origin = {'score':0}
             for h0_idx in range(H0_RANGE[0], H0_RANGE[1]):
                 hn_idx = h0_idx + self.base_payload_hops[-1]
-                sync_score = float(np.dot(p_dB[h0_idx + self.hop_idxs_Costas + 36 * HPS, :].ravel(), self.csync_flat))
+                sync_score = float(np.dot(p[h0_idx + self.hop_idxs_Costas + 36 * HPS, :].ravel(), self.csync_flat))
                 test_origin = {'f0_idx': f0_idx, 'h0_idx':h0_idx, 'cs':cycle_start_str, 'score':sync_score, 'hn_idx': hn_idx,
                                'fHz': 3.125 * f0_idx, 'dt': h0_idx / (SYM_RATE * HPS) - 0.7}
                 if test_origin['score'] > new_origin['score']:
                     new_origin = test_origin
-            if new_origin['score'] > 100:
+            if new_origin['score'] > 85:
                 hops, freq_idxs = new_origin['h0_idx'] + self.base_payload_hops, new_origin['f0_idx'] + self.base_freq_idxs
                 p_idx = np.ix_(hops, freq_idxs)
                 new_origin.update({'p_idx':p_idx})
@@ -330,21 +329,23 @@ class Receiver:
         for origin in origins:
             self.decode_queue.put(origin)
 
+    def signal_arriving(self, origin):
+        return origin['h0_idx'] < self.audio_in.grid_main_ptr < origin['hn_idx']
+
     def manage_decodes(self):
         decode_pending = False
         while True:
             time.sleep(0.001)
-            if self.run_decodes:
-                if not self.decode_queue.empty() and not decode_pending:
+            if self.run_decodes and not self.decode_queue.empty():
+                if not decode_pending:
                     origin = self.decode_queue.get()
                     decode_pending = True
-                if self.audio_in.grid_main_ptr > origin['hn_idx']:
+                if not self.signal_arriving(origin):
                     p = self.audio_in.grid_main[origin['p_idx']]
-                    p_dB = 10*np.log10(p)
-                    msg_tuple = decode(p_dB)
+                    msg_tuple = decode(p)
                     decode_pending = False
                     if msg_tuple and not msg_tuple in self.duplicate_filter:
-                        their_snr = np.clip(int(np.max(p_dB) - np.min(p_dB)) - 58, -24, 24)
+                        their_snr = np.clip(int(np.max(p) - np.min(p)) - 58, -24, 24)
                         self.duplicate_filter.append(msg_tuple)
                         self.send_output({'mtype':'decode', 'cyclestart_string': origin['cs'],
                                           'fHz':f"{origin['fHz']:7.2f}", 'dt':f"{origin['dt']:+04.2f}",
