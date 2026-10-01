@@ -94,7 +94,7 @@ def monitor_udp():
 
 def monitor_decodes():
     while not finished_audio:
-        time.sleep(5)
+        time.sleep(1)
         
         while not py_q.empty():
             time.sleep(0)

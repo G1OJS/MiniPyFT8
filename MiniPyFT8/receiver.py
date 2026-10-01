@@ -4,7 +4,7 @@ import time, pyaudio, threading, queue, socket, json
 HPS, BPT = 4, 2
 SYM_RATE, SAMP_RATE = 6.25, 12000
 T_SEARCH_0, T_SEARCH_1 =  4.6, 10.6
-LDPC_CONTROL = (36, 15)
+LDPC_CONTROL = (45, 15)
 H0_RANGE = [0, int(3.6 * SYM_RATE * HPS)]
 
 call_hashes = {}
@@ -285,12 +285,14 @@ class Receiver:
                 self.search_started = False
             if t_cyc > T_SEARCH_1 and not self.search_started:
                 self.search_started = True
+                self.run_decodes = False
+                while not self.decode_queue.empty():
+                    self.decode_queue.get()
                 t0_cyc = 15 * int(time.time() / 15)
-                cycle_start_str = time.strftime("%y%m%d_%H%M%S", time.gmtime(t0_cyc + 1))
+                cycle_start_str = time.strftime("%y%m%d_%H%M%S", time.gmtime(t0_cyc))
                 info = f"{cycle_start_str} ========================================"
                 self.send_output({'mtype':'rollover', 'info':info})
                 self.duplicate_filter = []
-                self.run_decodes = False
                 self.search(cycle_start_str)
                 self.run_decodes = True
             t_cyc_prev = t_cyc
@@ -318,14 +320,12 @@ class Receiver:
                                'fHz': 3.125 * f0_idx, 'dt': h0_idx / (SYM_RATE * HPS) - 0.7}
                 if test_origin['score'] > new_origin['score']:
                     new_origin = test_origin
-            if new_origin['score'] > 85:
+            if new_origin['score'] > 185:
                 hops, freq_idxs = new_origin['h0_idx'] + self.base_payload_hops, new_origin['f0_idx'] + self.base_freq_idxs
                 p_idx = np.ix_(hops, freq_idxs)
                 new_origin.update({'p_idx':p_idx})
                 origins.append(new_origin)
         origins.sort(key = lambda o: int(o['h0_idx']))
-        while not self.decode_queue.empty():
-            self.decode_queue.get()
         for origin in origins:
             self.decode_queue.put(origin)
 
