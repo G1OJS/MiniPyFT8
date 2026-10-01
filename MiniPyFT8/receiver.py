@@ -270,12 +270,12 @@ class Receiver:
             csync[sym_idx, 7 * BPT:] = 0.0
         self.csync_flat =  csync.ravel()
         self.send_output({'mtype':'info', 'info':'Receiver starting'})
-        while time.time() % 15 > 0.5:
-            time.sleep(0.1)
         threading.Thread(target = self.manage_cycle, daemon=True ).start()
         threading.Thread(target = self.manage_decodes, daemon=True ).start()
 
     def manage_cycle(self):
+        while time.time() % 15 > 0.5:
+            time.sleep(0.1)
         t_cyc, t_cyc_prev = 0, 0
         while True:
             time.sleep(0.1)
@@ -347,7 +347,7 @@ class Receiver:
                     if msg_tuple and not msg_tuple in self.duplicate_filter:
                         their_snr = np.clip(int(np.max(p) - np.min(p)) - 58, -24, 24)
                         self.duplicate_filter.append(msg_tuple)
-                        self.send_output({'mtype':'decode', 'cyclestart_string': origin['cs'],
+                        self.send_output({'mtype':'decode', 'cyclestart_string': origin['cs'], 't_decode':time.time(),
                                           'fHz':f"{origin['fHz']:7.2f}", 'dt':f"{origin['dt']:+04.2f}",
                                           'their_snr':f"{their_snr:+03d}", 'msg_tuple':msg_tuple})
                     

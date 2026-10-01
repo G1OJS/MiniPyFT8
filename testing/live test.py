@@ -152,30 +152,26 @@ def do_test(input_device_keywords, wav_range = None):
         baseline_counts.append(i)
         print(f"Loaded {len(baseline_counts)} cycle decode counts from {baseline_file}")
 
-    rx = Receiver(mic_keywords = input_device_keywords)
-
+    py_times, ws_times = [], []
+    
     wav_files = []
     if wav_range:
         for idx in range(*wav_range):
             wav_files.append(f"{wav_folder}/test_{idx:02d}.wav")
 
     wsjtx_all_tailer = Wsjtx_all_tailer(on_wsjtx_decode, silent = False)
-
+    rx = Receiver(mic_keywords = input_device_keywords)
     threading.Thread(target = monitor_decodes, daemon = True).start()
     threading.Thread(target = monitor_udp, daemon = True).start()
 
-    if wav_files:
-       soundout = SoundcardOut("CABLE, Input", wav_files, wav_file_time_offset = -1)
-
-    t = 15-time.time() % 15
+    t = 15-(time.time() % 15)
     if t > 0.05:
         print(f"Waiting to start test on next cycle ({t:6.1f}s)")
         time.sleep(t)
     t_start = time.time()
 
-    py_times, ws_times = [], []
-
-
+    if wav_files:
+       soundout = SoundcardOut("CABLE, Input", wav_files, wav_file_time_offset = -1)
 
 wav_folder = "C:/Users/drala/Documents/Projects/GitHub/ft8_lib/test/wav/20m_busy"
 baseline_file = 'MiniPyFT8_8_28_baseline.txt'
