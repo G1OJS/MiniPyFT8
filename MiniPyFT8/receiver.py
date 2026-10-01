@@ -4,7 +4,7 @@ import time, pyaudio, threading, queue, socket, json
 HPS, BPT = 4, 2
 SYM_RATE, SAMP_RATE = 6.25, 12000
 T_SEARCH_0, T_SEARCH_1 =  4.6, 10.6
-LDPC_CONTROL = (35, 12)
+LDPC_CONTROL = (30, 5)
 H0_RANGE = [0, int(3.6 * SYM_RATE * HPS)]
 
 call_hashes = {}
@@ -216,6 +216,7 @@ class AudioIn:
         self.stream = pyaudio.PyAudio().open(
             format = pyaudio.paInt16, channels=1, rate = SAMP_RATE, input = True, input_device_index = indev,
             frames_per_buffer = int(SAMP_RATE / (SYM_RATE * HPS)), stream_callback=self._callback,)
+        self.grid_main_ptr = 0
         self.set_pointer()
         self.stream.start_stream()
 
@@ -233,7 +234,10 @@ class AudioIn:
         print(f"[Audio] No audio device found matching {device_str_contains}")
 
     def set_pointer(self):
-        self.grid_main_ptr = int((time.time() % 15) * SYM_RATE * HPS)
+        ptr = int((time.time() % 15) * SYM_RATE * HPS)
+        if np.abs(self.grid_main_ptr - ptr) > 3:
+            self.grid_main_ptr = ptr
+            print('set pointer')
 
     def _callback(self, in_data, frame_count, time_info, status_flags):
         samples = np.frombuffer(in_data, dtype=np.int16).astype(np.float32)
@@ -281,8 +285,13 @@ class Receiver:
                 self.search_started = False
             if t_cyc > T_SEARCH_1 and not self.search_started:
                 self.search_started = True
+                t0_cyc = 15 * int(time.time() / 15)
+                cycle_start_str = time.strftime("%y%m%d_%H%M%S", time.gmtime(t0_cyc + 1))
+                info = f"{cycle_start_str} ========================================"
+                self.send_output({'mtype':'rollover', 'info':info})
+                self.duplicate_filter = []
                 self.run_decodes = False
-                self.search()
+                self.search(cycle_start_str)
                 self.run_decodes = True
             t_cyc_prev = t_cyc
 
@@ -295,24 +304,19 @@ class Receiver:
         self.sock_out.connect(('localhost', 2121))
         self.sock_out.send(json.dumps(msg_dict).encode('utf-8'))
 
-    def search(self):
-        t0_cyc = 15 * int(time.time() / 15)
-        cycle_start_str = time.strftime("%y%m%d_%H%M%S", time.gmtime(t0_cyc + 1))
-        info = f"{cycle_start_str} ========================================"
-        self.send_output({'mtype':'rollover', 'info':info})
-        self.duplicate_filter = []
+    def search(self, cycle_start_str):
         origins = []
         for f0_idx in range(int(100 / 3.125), self.audio_in.nFreqs - 8 * BPT, 1):
             time.sleep(0)
             freq_idxs = f0_idx + self.base_freq_idxs
             p = self.audio_in.grid_main[:, f0_idx:f0_idx+8*BPT]
-            p = 20*np.log10(p)
+            p_dB = 10*np.log10(p)
             new_origin = {'score':0}
             for h0_idx in range(H0_RANGE[0], H0_RANGE[1]):
                 hn_idx = h0_idx + self.base_payload_hops[-1]
-                sync_score = float(np.dot(p[h0_idx + self.hop_idxs_Costas + 36 * HPS, :].ravel(), self.csync_flat))
+                sync_score = float(np.dot(p_dB[h0_idx + self.hop_idxs_Costas + 36 * HPS, :].ravel(), self.csync_flat))
                 test_origin = {'f0_idx': f0_idx, 'h0_idx':h0_idx, 'cs':cycle_start_str, 'score':sync_score, 'hn_idx': hn_idx,
-                               'fHz': 3.125 * f0_idx, 'dt': h0_idx / (SYM_RATE * HPS) - 0.7, 'exhausted': False}
+                               'fHz': 3.125 * f0_idx, 'dt': h0_idx / (SYM_RATE * HPS) - 0.7}
                 if test_origin['score'] > new_origin['score']:
                     new_origin = test_origin
             if new_origin['score'] > 100:
@@ -321,25 +325,31 @@ class Receiver:
                 new_origin.update({'p_idx':p_idx})
                 origins.append(new_origin)
         origins.sort(key = lambda o: int(o['h0_idx']))
+        while not self.decode_queue.empty():
+            self.decode_queue.get()
         for origin in origins:
             self.decode_queue.put(origin)
 
     def manage_decodes(self):
+        decode_pending = False
         while True:
-            time.sleep(0.01)
-            if self.run_decodes and not self.decode_queue.empty():
-                origin = self.decode_queue.get()
-                while self.audio_in.grid_main_ptr < origin['hn_idx']:
-                    time.sleep(0.05)
-                p = self.audio_in.grid_main[origin['p_idx']]
-                p = 20*np.log10(p)
-                msg_tuple = decode(p)
-                if msg_tuple and not msg_tuple in self.duplicate_filter:
-                    their_snr = np.clip(int((np.max(p) - np.min(p))/2) - 58, -24, 24)
-                    self.duplicate_filter.append(msg_tuple)
-                    self.send_output({'mtype':'decode', 'cyclestart_string': origin['cs'],
-                                      'fHz':f"{origin['fHz']:7.2f}", 'dt':f"{origin['dt']:+04.2f}",
-                                      'their_snr':f"{their_snr:+03d}", 'msg_tuple':msg_tuple})
+            time.sleep(0.001)
+            if self.run_decodes:
+                if not self.decode_queue.empty() and not decode_pending:
+                    origin = self.decode_queue.get()
+                    decode_pending = True
+                if self.audio_in.grid_main_ptr > origin['hn_idx']:
+                    p = self.audio_in.grid_main[origin['p_idx']]
+                    p_dB = 10*np.log10(p)
+                    msg_tuple = decode(p_dB)
+                    decode_pending = False
+                    if msg_tuple and not msg_tuple in self.duplicate_filter:
+                        their_snr = np.clip(int(np.max(p_dB) - np.min(p_dB)) - 58, -24, 24)
+                        self.duplicate_filter.append(msg_tuple)
+                        self.send_output({'mtype':'decode', 'cyclestart_string': origin['cs'],
+                                          'fHz':f"{origin['fHz']:7.2f}", 'dt':f"{origin['dt']:+04.2f}",
+                                          'their_snr':f"{their_snr:+03d}", 'msg_tuple':msg_tuple})
+                    
 
 if __name__ == "__main__":
     rx = Receiver(mic_keywords = ['Mic', 'CODEC'], max_freq = 2900, output = 'print')
