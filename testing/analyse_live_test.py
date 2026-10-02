@@ -23,7 +23,7 @@ def plot_staircase(defs):
             with open(d[0], 'r') as f:
                 lines = f.readlines()
                 times = [float(l.split()[2]) - offset for l in lines]
-                ax.plot(times, np.array(range(len(times))), label = d[1], color = d[2], marker = 'o', markersize = 3)
+                ax.plot(times, np.array(range(len(times))), label = d[1], lw = 0.3, color = d[2], marker = 'o', markersize = 1)
     ax.legend()
     plt.show()
 
