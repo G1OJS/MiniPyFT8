@@ -367,6 +367,8 @@ class Receiver:
                     p = self.audio_in.grid_main[origin['p_idx']]
                     msg_tuple, hcode = decode_ldpc(p)
                     decode_pending = False
+                    if msg_tuple:
+                        self.decoded_f_idxs.append(origin['f0_idx'])
 
             if msg_tuple and not msg_tuple in self.duplicate_filter:
                 their_snr = np.clip(int(np.max(p) - np.min(p)) - 58, -24, 24)
@@ -374,6 +376,7 @@ class Receiver:
                 self.send_output({'mtype':'decode', 'cyclestart_string': origin['cs'], 't_decode':time.time(),
                                   'fHz':f"{origin['fHz']:7.2f}", 'dt':f"{origin['dt']:+04.2f}", 'hcode':hcode,
                                   'their_snr':f"{their_snr:+03d}", 'msg_tuple':msg_tuple})
+                msg_tuple = None
                     
 
 if __name__ == "__main__":
