@@ -25,7 +25,7 @@ class SoundcardOut:
                     self.output_device_index = dev_idx
                     break
             if not self.output_device_index:
-                time.tlog(f"[Audio Out] No output audio device found matching {outputcard_keywords}", verbose = True)
+                print(f"[Audio Out] No output audio device found matching {outputcard_keywords}", verbose = True)
                 sys.exit(1)
 
     def play_wavs(self, wav_files, sr=12000):
@@ -106,7 +106,8 @@ def monitor_decodes():
             py_times.append(float(m['t_decode']) - t_start)
             decode_count = len(py_times)
             diff = decode_count - baseline_decode_count
-            py_info  = f"{decode_count:03d}({diff:+03d}) {py_cycle[1]:03d} {py_times[-1]:7.2f} {m}"
+            txt = f"{m['hcode']}, {m['msg_tuple']}"
+            py_info  = f"{decode_count:03d}({diff:+03d}) {py_cycle[1]:03d} {py_times[-1]:7.2f} {txt}"
             with open('MiniPyFT8.txt', 'a') as f:
                 f.write(f"{py_info}\n")
             print(py_info)
